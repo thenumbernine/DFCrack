@@ -14,67 +14,131 @@ struct DFCrack {
 	another handles update
 	soo ... give each thread its own lua state?
 	but then how to manage that + the package.loaded + the directory structure of scripts?
+	for now i'll distinguish by naming one dfmain.lua / _G.dfmain and the other dfsim
+	each state will only have its respective table defined
+	
+	so...
+	dfcrack/dfmain.lua
+		.sdlInit()
+		.sdlQuit()
+		.sdlEvent()
+	dfcrack/dfsim.lua
+		.update()
+	.. these have to be there.  the glue code doesn't test.
 	*/
 	LuaCxx::State luaMain;
+	
 	LuaCxx::State luaSim;
+	bool hasInitSim = {};
+	
 	DFCrack() {
-//std::cout << "DFCrack::DFCrack this_thread=" << std::this_thread::get_id() << std::endl;
+std::cout << "DFCrack::DFCrack begin"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;
 		luaMain
 		.stack()
 		.getGlobal("require")
-		.push("dfc")
+		.push("dfmain")
 		.call(1, 1)
-		.setGlobal("dfc");
+		.setGlobal("dfmain");
+std::cout << "DFCrack::DFCrack end"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;	
 	}
 	~DFCrack() {
 // trust in __gc methods to clean up?		
-//std::cout << "DFCrack::DFCrack this_thread=" << std::this_thread::get_id() << std::endl;
+std::cout << "DFCrack::~DFCrack"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;	
 	}
 	void sdlInit() {
-//std::cout << "DFCrack::sdlInit this_thread=" << std::this_thread::get_id() << std::endl;
+std::cout << "DFCrack::sdlInit begin"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;	
 		luaMain
 		.stack()
-		.getGlobal("dfc")
+		.getGlobal("dfmain")
 		.get("sdlInit")
 		.call(0, 0)
 		.pop();
+std::cout << "DFCrack::sdlInit end"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;	
 	}
 	void sdlQuit() {
-std::cout << "DFCrack::sdlQuit this_thread=" << std::this_thread::get_id() << std::endl;
+std::cout << "DFCrack::sdlQuit begin"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;
 		luaMain
 		.stack()
-		.getGlobal("dfc")
+		.getGlobal("dfmain")
 		.get("sdlQuit")
 		.call(0, 0)
 		.pop();
+std::cout << "DFCrack::sdlQuit end"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;
+		// TODO here or dtor run the dfsim.quit
 	}
 	bool sdlEvent(SDL_Event * ev) {
-//std::cout << "DFCrack::sdlEvent begin this_thread=" << std::this_thread::get_id() << std::endl;
+std::cout << "DFCrack::sdlEvent begin"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;
 		bool result = true;		// true default = df handles sdl events
+#if 0	//ugh segfault why
 		luaMain
 		.stack()
-		.getGlobal("dfc")
-		.get("event");
-		lua_pushlightuserdata(luaMain.getState(), ev);	// hmm is there no way to push a cdata void* onto the stack?
+		.getGlobal("dfmain")
+		.get("sdlEvent");
+//		lua_pushlightuserdata(luaMain.getState(), ev);	// hmm is there no way to push a cdata void* onto the stack?
 		luaMain
 		.stack()
-		.call(1, 0)
+		.call(0, 0)
 		.pop(result)
 		.pop();
-//std::cout << "DFCrack::sdlEvent end this_thread=" << std::this_thread::get_id() << std::endl;
+#endif
+std::cout << "DFCrack::sdlEvent end"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaMain.stack().top()
+	<< std::endl;
 		return result;
 	}
 	
 	// run on a separate thread
 	void update() {
+std::cout << "DFCrack::update begin"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaSim.stack().top()
+	<< std::endl;
+		if (!hasInitSim) {
+			hasInitSim = true;
+			luaSim
+			.stack()
+			.getGlobal("require")
+			.push("dfsim")
+			.call(1, 1)
+			.setGlobal("dfsim");
+		}
 //std::cout << "DFCrack::update begin this_thread=" << std::this_thread::get_id() << std::endl;
 		luaSim
 		.stack()
-		.getGlobal("dfc")
+		.getGlobal("dfsim")
 		.get("update")
 		.call(0, 0)
 		.pop();
 //std::cout << "DFCrack::update end this_thread=" << std::this_thread::get_id() << std::endl;
+std::cout << "DFCrack::update end"
+	<< " this_thread=" << std::this_thread::get_id() 
+	<< " top=" << luaSim.stack().top()
+	<< std::endl;
 	}
 
 };
