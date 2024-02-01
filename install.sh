@@ -1,5 +1,21 @@
 #!/bin/env sh
-DFCRACK_LIBPATH="/home/chris/Games/Dwarf Fortress/df_47_05_linux_with_dfcrack_testing/dfcrack/lib/"
-cp ../Common/dist/linux/debug/libCommon.so "${DFCRACK_LIBPATH}"
-cp ../LuaCxx/dist/linux/debug/libLuaCxx_LuaJIT.so "${DFCRACK_LIBPATH}"
-cp dist/linux/debug/libDFCrack.so "${DFCRACK_LIBPATH}"
+DF_PATH="$HOME/Games/Dwarf Fortress/df_47_05_linux_with_dfcrack_testing"
+DFCRACK_PATH="$DF_PATH/dfcrack"
+DFCRACK_LUAPATH="$DFCRACK_PATH"
+DFCRACK_LIBPATH="$DFCRACK_PATH/lib"
+
+# mkdirs
+mkdir -p "$DFCRACK_PATH"
+mkdir -p "$DFCRACK_LIBPATH"
+mkdir -p "$DFCRACK_LUAPATH"
+
+# copy libs over
+cp ../Common/dist/linux/debug/libCommon.so "$DFCRACK_LIBPATH"
+cp ../LuaCxx/dist/linux/debug/libLuaCxx_LuaJIT.so "$DFCRACK_LIBPATH"
+cp dist/linux/debug/libDFCrack.so "$DFCRACK_LIBPATH"
+
+# copy launch script over
+cp run-dfcrack.sh "$DF_PATH"
+
+# copy rest of scripts over
+rsync -avm --include=* -f 'hide,! */' dfcrack "$DFCRACK_LUAPATH"
