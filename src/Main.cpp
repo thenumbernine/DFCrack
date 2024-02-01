@@ -7,6 +7,23 @@
 #include <iostream>
 #include <thread>	//debugging / checking thread of events vs updates vs init
 
+#if 0
+#define DEBUG_BEGIN(x, lua)\
+std::cout << #x " begin"\
+	<< " this_thread=" << std::this_thread::get_id() \
+	<< " top=" << lua.stack().top()\
+	<< std::endl;
+
+#define DEBUG_END(x, lua)\
+std::cout << #x " end"\
+	<< " this_thread=" << std::this_thread::get_id() \
+	<< " top=" << lua.stack().top()\
+	<< std::endl;
+#else
+#define DEBUG_BEGIN(x, lua)
+#define DEBUG_END(x, lua)
+#endif
+
 struct DFCrack {
 	/*
 	ok there's two threads at play here
@@ -32,66 +49,43 @@ struct DFCrack {
 	bool hasInitSim = {};
 	
 	DFCrack() {
-std::cout << "DFCrack::DFCrack begin"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;
+DEBUG_BEGIN(DFCrack::DFCrack, luaMain)
 		luaMain
 		.stack()
 		.getGlobal("require")
 		.push("dfmain")
 		.call(1, 1)
 		.setGlobal("dfmain");
-std::cout << "DFCrack::DFCrack end"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;	
+DEBUG_END(DFCrack::DFCrack, luaMain)
 	}
 	~DFCrack() {
 // trust in __gc methods to clean up?		
-std::cout << "DFCrack::~DFCrack"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;	
+DEBUG_BEGIN(DFCrack::~DFCrack, luaMain)
+DEBUG_END(DFCrack::~DFCrack, luaMain)
 	}
 	void sdlInit() {
-std::cout << "DFCrack::sdlInit begin"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;	
+DEBUG_BEGIN(DFCrack::sdlInit, luaMain)
 		luaMain
 		.stack()
 		.getGlobal("dfmain")
 		.get("sdlInit")
 		.call(0, 0)
 		.pop();
-std::cout << "DFCrack::sdlInit end"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;	
+DEBUG_END(DFCrack::sdlInit, luaMain)
 	}
 	void sdlQuit() {
-std::cout << "DFCrack::sdlQuit begin"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;
+DEBUG_BEGIN(DFCrack::sdlQuit, luaMain)
 		luaMain
 		.stack()
 		.getGlobal("dfmain")
 		.get("sdlQuit")
 		.call(0, 0)
 		.pop();
-std::cout << "DFCrack::sdlQuit end"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;
+DEBUG_END(DFCrack::sdlQuit, luaMain)
 		// TODO here or dtor run the dfsim.quit
 	}
 	bool sdlEvent(SDL_Event * ev) {
-std::cout << "DFCrack::sdlEvent begin"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;
+DEBUG_BEGIN(DFCrack::sdlEvent, luaMain)
 		bool result = true;		// true default = df handles sdl events
 #if 0	//ugh segfault why
 		luaMain
@@ -105,19 +99,13 @@ std::cout << "DFCrack::sdlEvent begin"
 		.pop(result)
 		.pop();
 #endif
-std::cout << "DFCrack::sdlEvent end"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaMain.stack().top()
-	<< std::endl;
+DEBUG_END(DFCrack::sdlEvent, luaMain)
 		return result;
 	}
 	
 	// run on a separate thread
 	void update() {
-std::cout << "DFCrack::update begin"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaSim.stack().top()
-	<< std::endl;
+DEBUG_BEGIN(DFCrack::update, luaSim)
 		if (!hasInitSim) {
 			hasInitSim = true;
 			luaSim
@@ -127,18 +115,13 @@ std::cout << "DFCrack::update begin"
 			.call(1, 1)
 			.setGlobal("dfsim");
 		}
-//std::cout << "DFCrack::update begin this_thread=" << std::this_thread::get_id() << std::endl;
 		luaSim
 		.stack()
 		.getGlobal("dfsim")
 		.get("update")
 		.call(0, 0)
 		.pop();
-//std::cout << "DFCrack::update end this_thread=" << std::this_thread::get_id() << std::endl;
-std::cout << "DFCrack::update end"
-	<< " this_thread=" << std::this_thread::get_id() 
-	<< " top=" << luaSim.stack().top()
-	<< std::endl;
+DEBUG_BEGIN(DFCrack::update, luaSim)
 	}
 
 };

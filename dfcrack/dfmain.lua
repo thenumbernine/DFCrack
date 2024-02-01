@@ -1,7 +1,7 @@
--- or better TODO put this in the run-dfcrack.sh
--- or better TODO move what libs I use into the dfcrack folder
-package.path = package.path .. ';/home/chris/Projects/lua/?.lua'
-package.path = package.path .. ';/home/chris/Projects/lua/?/?.lua'
+--[[
+main entry point
+called by the lua state that is run on the main/event thread (SDL_Init, SDL_Quit, SDL_PollEvent)
+--]]
 
 local ffi = require 'ffi'
 require 'ffi.req' 'c.pthread'

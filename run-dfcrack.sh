@@ -6,8 +6,13 @@ export SDL_DISABLE_LOCK_KEYS=1 # Work around for bug in Debian/Ubuntu SDL patch.
 #export SDL_VIDEO_CENTERED=1 # Centre the screen.  Messes up resizing.
 
 # these are paths relative to dwarf fortress that should match up with the dfcrack paths in install.sh
-LUA_PATH="./dfcrack/?.lua;./lua/?/?.lua;./?.lua"
-LUA_CPATH="./dfcrack/lib/?.so;./lib/?.so"
+DFCRACK_REL_PATH="./dfcrack"
+LUA_PATH="$DFCRACK_REL_PATH/?.lua;$DFCRACK_REL_PATH/?/?.lua"
+LUA_CPATH="$DFCRACK_REL_PATH/lib/?.so"
+# me for lazy use of other projects without the hassle of packaging them just yet
+LUA_PROJECT_PATH="$HOME/Projects/lua"
+LUA_PATH="$LUA_PATH;$LUA_PROJECT_PATH/?.lua;$LUA_PROJECT_PATH/?/?.lua"
+LUA_CPATH="$LUA_CPATH;$LUA_PROJECT_PATH/?.so"
 
 # Disable bundled libstdc++
 libcxx_orig="libs/libstdc++.so.6"
