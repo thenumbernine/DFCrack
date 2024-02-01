@@ -1,4 +1,4 @@
-#!/usr/bin/env lua
+#!/usr/bin/env luajit
 --[[
 quick port of dfhack's codegen.out.xml into a lua file (so i don't have to parse the xml at runtime)
 run this from the root dir, so everything is offline/
@@ -43,6 +43,21 @@ for _,ch in ipairs(arch.child) do
 	end
 end
 
+-- offset by linux address
+-- hmm need to do this at runtime?
+local ffi = require 'ffi'
+local baseaddr = ({
+	Windows = {x64 = 0x140000000, x86 = 0x400000},
+	OSX = {x64 = 0x100000000, x86 = 0x1000},
+	Linux = {x64 = 0x400000, x86 = 0x8048000},
+})[ffi.os][ffi.arch]
+for _,var in pairs(vars) do
+	if var.addr then
+		var.addr = var.addr + baseaddr
+	end
+end
+
+print"local ffi = require 'ffi'"
 local globals = htmlparser.parse(assert((dfhacksrcdir/'xml/df.globals.xml'):read()))
 local globalsDataDef = htmlcommon.findtag(globals, 'data-definition')
 for _,ch in ipairs(globalsDataDef.child) do
@@ -57,10 +72,30 @@ for _,ch in ipairs(globalsDataDef.child) do
 		if not var then
 			print('-- global '..name..' has no address...')
 		elseif typename then
-			print("df."..name.." = ffi.cast('"..typename.."*', "..var.addr..")")
+			local comment = ({
+				bool = true,
+				int32_t = true,
+			})[typename] and '' or '--'
+			print(comment.."df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
 		else
 			-- is a singleton structure
-			print('-- TODO '..name)
+			if ch.child 
+			and #ch.child == 1 
+			and ch.child[1].type == 'tag'
+			and ch.child[1].tag == 'enum'
+			then
+				-- only one field.  typedef.  maybe an enum.
+				-- how come the base-type is specified in the variable and not in the type definition?
+				local typename = htmlcommon.findattr(ch.child[1], 'type-name')
+				local basetype = htmlcommon.findattr(ch.child[1], 'base-type')
+				-- in fact for that reason, how about I don't make typedefs of enums ...
+				--print('ffi.cdef[[typedef '..basetype..' df_enum_'..typename..';]]')
+				-- typename will point to the enum info
+				-- basetype is the C type
+				print("df."..name.." = ffi.cast('"..basetype.."*', "..('0x%x'):format(var.addr)..")")
+			else
+				print('-- TODO '..name)
+			end
 		end
 	else
 		error("unknown node: "..tostring(ch.type))
