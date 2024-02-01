@@ -1,0 +1,4 @@
+distName='DFCrack'
+distType='lib'
+-- LuaCxx should be built with LuaCxx_luaVer=JIT
+depends:append{'../Common', '../Tensor', '../LuaCxx'}
