@@ -20,7 +20,8 @@ function dfsim.update()
 --[[ debugging
 	print(('dfmain.update pthread_self: %x'):format(pthread.pthread_self()))
 --]]
-	print('version', df.version, df.version[0])
+--	print('version', df.version, df.version[0])	-- works
+	print('cursor', df.cursor[0].x, df.cursor[0].y, df.cursor[0].z)
 end
 
 return dfsim

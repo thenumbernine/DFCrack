@@ -181,5 +181,7 @@ for _,ch in ipairs(globalsDataDef.child) do
 	end
 end
 
+print'ffi.cdef[['
 print(structDefs:concat'\n'..'\n')
+print']]'
 print(ptrDefs:concat'\n'..'\n')
