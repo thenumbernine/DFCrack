@@ -84,7 +84,6 @@ for _,var in pairs(vars) do
 end
 --]]
 
-print"local ffi = require 'ffi'"
 local globals = htmlparser.parse(assert((dfhacksrcdir/'xml/df.globals.xml'):read()))
 local globalsDataDef = htmlcommon.findtag(globals, 'data-definition')
 
@@ -181,7 +180,10 @@ for _,ch in ipairs(globalsDataDef.child) do
 	end
 end
 
+print"local ffi = require 'ffi'"
 print'ffi.cdef[['
 print(structDefs:concat'\n'..'\n')
 print']]'
+print'local df = {}'
 print(ptrDefs:concat'\n'..'\n')
+print'return df'

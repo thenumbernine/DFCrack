@@ -7,7 +7,7 @@
 
 struct SDL_Event;
 
-DFCRACK_CEXPORT int SDL_NumJoysticks(void);
-DFCRACK_CEXPORT void SDL_Quit(void);
+DFCRACK_CEXPORT int SDL_NumJoysticks();
+DFCRACK_CEXPORT void SDL_Quit();
 DFCRACK_CEXPORT int SDL_PollEvent(SDL_Event * const event);
 DFCRACK_CEXPORT int SDL_Init(uint32_t flags);

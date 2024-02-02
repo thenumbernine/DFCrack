@@ -10,9 +10,7 @@ local pthread = ffi.C
 --]]
 
 -- TODO clean this up
-ffi = require 'ffi'
-df = {}
-require 'mem'
+local df = require 'mem'
 
 local dfsim = {}
 
@@ -21,7 +19,12 @@ function dfsim.update()
 	print(('dfmain.update pthread_self: %x'):format(pthread.pthread_self()))
 --]]
 --	print('version', df.version, df.version[0])	-- works
-	print('cursor', df.cursor[0].x, df.cursor[0].y, df.cursor[0].z)
+--	print('cursor', df.cursor[0].x, df.cursor[0].y, df.cursor[0].z)
+
+--[[ TODO monitor a file for timestamp, something like 'exec-sim.lua'
+-- and upon timestamp update, read and execute its contents
+--]]
+
 end
 
 return dfsim
