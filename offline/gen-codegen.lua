@@ -7,7 +7,6 @@ turns out xml2lua isn't a dom parser, so ...
 --]]
 
 local path = require 'ext.path'
-local tolua = require 'ext.tolua'
 local table = require 'ext.table'
 
 local dfhacksrcdir = path'../../other/dfhack-0.47.05-r8/library/'
@@ -15,13 +14,30 @@ local dfhacksrcdir = path'../../other/dfhack-0.47.05-r8/library/'
 local htmlparser = require 'htmlparser'
 local htmlcommon = require 'htmlparser.common'
 
+local ffi = require 'ffi'
+local osarch = ffi.os..'_'..ffi.arch	-- one dereference instead of two
+local dfosarch = assert(({
+	Windows_x86 = 'SDL win32',	-- v0.47.05 SDL win32
+	Windows_x64 = 'SDL win64',		
+	Linux_x86 = 'linux32',
+	Linux_x64 = 'linux64',	-- v0.47.05 linux64
+	OSX_x86 = 'osx32',
+	OSX_x64 = 'osx64',
+})[osarch])
+local dfos = assert(({
+	Linux = 'linux',
+	Windows = 'windows',
+	OSX = 'darwin',
+})[ffi.os])
+
+
 local md5
 local vars = {}
 
 local symbols = htmlparser.parse(assert((dfhacksrcdir/'xml/symbols.xml'):read()))
 local symbolsDataDef = htmlcommon.findtag(symbols, 'data-definition')
-local arch = htmlcommon.findchild(symbolsDataDef, 'symbol-table', {name='v0.47.05 linux64', ['os-type']='linux'})
-for _,ch in ipairs(arch.child) do
+local symbolsArch = htmlcommon.findchild(symbolsDataDef, 'symbol-table', {name='v0.47.05 '..dfosarch, ['os-type']=dfos})
+for _,ch in ipairs(symbolsArch.child) do
 	if ch.tag == 'md5-hash' then
 		assert(not md5)
 		md5 = htmlcommon.findattr(ch, 'value')
@@ -43,19 +59,28 @@ for _,ch in ipairs(arch.child) do
 	end
 end
 
+--[[
 -- offset by linux address
 -- hmm need to do this at runtime?
-local ffi = require 'ffi'
-local baseaddr = ({
-	Windows = {x64 = 0x140000000, x86 = 0x400000},
-	OSX = {x64 = 0x100000000, x86 = 0x1000},
-	Linux = {x64 = 0x400000, x86 = 0x8048000},
-})[ffi.os][ffi.arch]
+ok while dfhack library/include/Memory.h does list these,
+it only assigns them in Process::getBase
+which I only see called by Process-windows (not by linux or osx ...)
+also called in VersionInfoFactory::ParserVersion setBase for all OS's
+so this is handy ...
+--]]
+--[[
+local baseaddr = assert(({
+	Windows_x64 = 0x140000000, Windows_x86 = 0x400000,
+	OSX_x64 = 0x100000000, OSX_x86 = 0x1000,
+	Linux_x64 = 0x400000, Linux_x86 = 0x8048000,
+})[osarch], "couldn't find baseaddr for os/arch "..tostring(osarch))
+print(('-- image base: 0x%x'):format(baseaddr))
 for _,var in pairs(vars) do
 	if var.addr then
 		var.addr = var.addr + baseaddr
 	end
 end
+--]]
 
 print"local ffi = require 'ffi'"
 local globals = htmlparser.parse(assert((dfhacksrcdir/'xml/df.globals.xml'):read()))

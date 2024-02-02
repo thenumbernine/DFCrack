@@ -13,7 +13,6 @@ local pthread = ffi.C
 ffi = require 'ffi'
 df = {}
 require 'mem'
-print('version', df.version[0])
 
 local dfsim = {}
 
@@ -21,6 +20,7 @@ function dfsim.update()
 --[[ debugging
 	print(('dfmain.update pthread_self: %x'):format(pthread.pthread_self()))
 --]]
+	print('version', df.version, df.version[0])
 end
 
 return dfsim
