@@ -3,7 +3,7 @@ local ffi = require 'ffi'
 
 local df = {}
 df.cursor = ffi.cast('int3_t*', 0x19bfe60)
-df.selectionRect = ffi.cast('Rect3D*', 0x19bfe40)
+df.selectionRect = ffi.cast('SelectionRect*', 0x19bfe40)
 df.gamemode = ffi.cast('int32_t*', 0x19bfe30)
 df.gametype = ffi.cast('int32_t*', 0x19bfe20)
 -- df.uiMenuWidth = ffi.cast('static-array*', 0x19bfd61)
