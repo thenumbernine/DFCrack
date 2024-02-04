@@ -37,7 +37,7 @@ function dfsim.update()
 		if not haveRunFastDwarf then
 			haveRunFastDwarf = true
 			for i,u in ipairs(df.world.units.active) do
-				print('unit', i, u)
+				print('unit', i, u, u:isCitizen())
 			end
 		end
 	else

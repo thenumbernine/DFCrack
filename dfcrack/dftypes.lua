@@ -73,9 +73,12 @@ end
 
 makeStdVector('void*', 'vector_ptr')
 makeStdVector('char*', 'vector_char_ptr')
+makeStdVector('uint8_t', 'vector_byte')	-- ubyte?
 makeStdVector('int8_t', 'vector_sbyte')
 makeStdVector'short'
+makeStdVector('unsigned short', 'vector_ushort')
 makeStdVector'int'
+makeStdVector('unsigned int', 'vector_uint')
 makeStdVector('std_string', 'vector_string')
 
 -- TODO WTF WHO USES BOOL VECTOR?!?!?!??!
@@ -128,6 +131,11 @@ typedef struct <?=name?> {
 		name = name,
 	}))
 end
+
+-- fwd decls:
+
+ffi.cdef'typedef struct Building Building;'
+makeVectorPtr'Building'
 
 -- coord.h, coord2d.h
 
@@ -463,6 +471,7 @@ enum {
 	JobSkill_RIDING, /* 136, 0x88*/
 };
 ]]
+ffi.cdef'typedef vector_short vector_JobSkill;'
 
 -- profession.h
 
@@ -830,6 +839,7 @@ enum {
 	ItemType_BRANCH, /* 90, 0x5A*/
 };
 ]]
+ffi.cdef'typedef vector_short vector_ItemType;'
 
 -- history_hit_item.h
 
@@ -1223,6 +1233,390 @@ typedef struct {
 } UnitGenes;
 ]]
 
+-- cie_add_tag_mask1.h
+
+ffi.cdef[[
+typedef union {
+	uint32_t flags;
+	struct {
+		uint32_t EXTRAVISION : 1;
+		uint32_t OPPOSED_TO_LIFE : 1;
+		uint32_t NOT_LIVING : 1;
+		uint32_t NOEXERT : 1;
+		uint32_t NOPAIN : 1;
+		uint32_t NOBREATHE : 1;
+		uint32_t HAS_BLOOD : 1;
+		uint32_t NOSTUN : 1;
+		uint32_t NONAUSEA : 1;
+		uint32_t NO_DIZZINESS : 1;
+		uint32_t NO_FEVERS : 1;
+		uint32_t TRANCES : 1;
+		uint32_t NOEMOTION : 1;
+		uint32_t LIKES_FIGHTING : 1;
+		uint32_t PARALYZEIMMUNE : 1;
+		uint32_t NOFEAR : 1;
+		uint32_t NO_EAT : 1;
+		uint32_t NO_DRINK : 1;
+		uint32_t NO_SLEEP : 1;
+		uint32_t MISCHIEVOUS : 1;
+		uint32_t NO_PHYS_ATT_GAIN : 1;
+		uint32_t NO_PHYS_ATT_RUST : 1;
+		uint32_t NOTHOUGHT : 1;
+		uint32_t NO_THOUGHT_CENTER_FOR_MOVEMENT : 1;
+		uint32_t CAN_SPEAK : 1;
+		uint32_t CAN_LEARN : 1;
+		uint32_t UTTERANCES : 1;
+		uint32_t CRAZED : 1;
+		uint32_t BLOODSUCKER : 1;
+		uint32_t NO_CONNECTIONS_FOR_MOVEMENT : 1;
+		uint32_t SUPERNATURAL : 1;
+		uint32_t anon_1 : 1;
+	};
+} CIEAddTagMask1;
+]]
+
+-- cie_add_tag_mask2.h
+
+ffi.cdef[[
+typedef union {
+	uint32_t flags;
+	struct {
+		uint32_t NO_AGING : 1;
+		uint32_t MORTAL : 1;
+		uint32_t STERILE : 1;
+		uint32_t FIT_FOR_ANIMATION : 1;
+		uint32_t FIT_FOR_RESURRECTION : 1;
+	};
+} CIEAddTagMask2;
+]]
+
+-- material_vec_ref.h
+
+ffi.cdef[[
+typedef struct {
+	vector_short matType;
+	vector_int matIndex;
+} MaterialVecRef;
+]]
+
+-- body_part_status.h
+
+ffi.cdef[[
+typedef union {
+	uint32_t flags;
+	struct {
+		uint32_t onFire : 1;
+		uint32_t missing : 1;
+		uint32_t organLoss : 1; /*!< cyan */
+		uint32_t organDamage : 1; /*!< yellow */
+		uint32_t muscleLoss : 1; /*!< red */
+		uint32_t muscleDamage : 1; /*!< yellow */
+		uint32_t boneLoss : 1; /*!< red */
+		uint32_t boneDamage : 1; /*!< yellow */
+		uint32_t skinDamage : 1; /*!< brown */
+		uint32_t motorNerveSevered : 1;
+		uint32_t sensoryNerveSevered : 1;
+		uint32_t spilledGuts : 1;
+		uint32_t hasSplint : 1;
+		uint32_t hasBandage : 1;
+		uint32_t hasPlasterCast : 1;
+		uint32_t grime : 3;
+		uint32_t severedOrJammed : 1; /*!< seen e.g. on ribs smashed by blunt attack, but quickly disappeared */
+		uint32_t underShell : 1;
+		uint32_t isShell : 1;
+		uint32_t mangled : 1; /*!< a wounded body part is described as being mangled beyond recognition when this flag is set */
+		uint32_t unk20 : 1; /*!< on zombified head */
+		uint32_t gelded : 1; /*!< set on GELDABLE body parts after a unit has been gelded */
+	};
+} BodyPartStatus;
+]]
+makeStdVector'BodyPartStatus'
+
+-- body_layer_status.h
+
+ffi.cdef[[
+typedef union {
+	uint32_t flags;
+	struct {
+		uint32_t gone : 1;
+		uint32_t leaking : 1;
+	};
+} BodyLayerStatus;
+]]
+makeStdVector'BodyLayerStatus'
+
+-- body_component_info.h
+
+ffi.cdef[[
+typedef struct {
+	vector_BodyPartStatus bodyPartStatus;
+	vector_uint numberedMasks; /*!< 1 bit per instance of a numbered body part */
+	vector_uint nonSolidRemaining; /*!< 0-100% */
+	vector_BodyLayerStatus layerStatus;
+	vector_uint layerWoundArea;
+	vector_uint layerCutFraction; /*!< 0-10000 */
+	vector_uint layerDentFraction; /*!< 0-10000 */
+	vector_uint layerEffectFraction; /*!< 0-1000000000 */
+} BodyComponentInfo;
+]]
+
+-- unit_wound.h
+
+-- TODO
+ffi.cdef'typedef struct UnitWound UnitWound;'
+makeVectorPtr'UnitWound'
+
+-- caste_body_info.h
+
+-- TODO
+ffi.cdef'typedef struct CasteBodyInfo CasteBodyInfo;'
+
+-- unit_attribute.h
+
+ffi.cdef[[
+typedef struct {    
+	int32_t value; /*!< effective = value - softDemotion */
+	int32_t maxValue;
+	int32_t improveCounter; /*!< counts to PHYS_ATT_RATES improve cost; then value++ */
+	int32_t unusedCounter; /*!< counts to PHYS_ATT_RATES unused rate; then rustCounter++ */
+	int32_t softDemotion; /*!< 0-100; when not 0 blocks improveCounter */
+	int32_t rustCounter; /*!< counts to PHYS_ATT_RATES rust; then demotionCounter++ */
+	int32_t demotionCounter; /*!< counts to PHYS_ATT_RATES demotion; then value--; soft_demotion++ */
+} UnitAttribute;
+]]
+
+-- body_size_info.h
+
+ffi.cdef[[
+typedef struct {
+	int32_t sizeCur;
+	int32_t sizeBase;
+	int32_t areaCur; /*!< size_cur^0.666 */
+	int32_t areaBase; /*!< size_base^0.666 */
+	int32_t lengthCur; /*!< (size_cur*10000)^0.333 */
+	int32_t lengthBase; /*!< (size_base*10000)^0.333 */
+} BodySizeInfo;
+]]
+
+-- spatter.h
+
+-- TODO
+ffi.cdef[[typedef struct Spatter Spatter;]]
+makeVectorPtr'Spatter'
+
+-- unit_action.h
+
+-- TODO
+ffi.cdef[[typedef struct UnitAction UnitAction;]]
+makeVectorPtr'UnitAction'
+
+-- death_type.h
+
+ffi.cdef[[
+typedef int16_t DeathType;
+enum {
+	DeathType_NONE = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	DeathType_OLD_AGE, // 0, 0x0
+	DeathType_HUNGER, // 1, 0x1
+	DeathType_THIRST, // 2, 0x2
+	DeathType_SHOT, // 3, 0x3
+	DeathType_BLEED, // 4, 0x4
+	DeathType_DROWN, // 5, 0x5
+	DeathType_SUFFOCATE, // 6, 0x6
+	DeathType_STRUCK_DOWN, // 7, 0x7
+	DeathType_SCUTTLE, // 8, 0x8
+	DeathType_COLLISION, // 9, 0x9
+	DeathType_MAGMA, // 10, 0xA
+	DeathType_MAGMA_MIST, // 11, 0xB
+	DeathType_DRAGONFIRE, // 12, 0xC
+	DeathType_FIRE, // 13, 0xD
+	DeathType_SCALD, // 14, 0xE
+	DeathType_CAVEIN, // 15, 0xF
+	DeathType_DRAWBRIDGE, // 16, 0x10
+	DeathType_FALLING_ROCKS, // 17, 0x11
+	DeathType_CHASM, // 18, 0x12
+	DeathType_CAGE, // 19, 0x13
+	DeathType_MURDER, // 20, 0x14
+	DeathType_TRAP, // 21, 0x15
+	DeathType_VANISH, // 22, 0x16
+	DeathType_QUIT, // 23, 0x17
+	DeathType_ABANDON, // 24, 0x18
+	DeathType_HEAT, // 25, 0x19
+	DeathType_COLD, // 26, 0x1A
+	DeathType_SPIKE, // 27, 0x1B
+	DeathType_ENCASE_LAVA, // 28, 0x1C
+	DeathType_ENCASE_MAGMA, // 29, 0x1D
+	DeathType_ENCASE_ICE, // 30, 0x1E
+	DeathType_BEHEAD, // 31, 0x1F
+	DeathType_CRUCIFY, // 32, 0x20
+	DeathType_BURY_ALIVE, // 33, 0x21
+	DeathType_DROWN_ALT, // 34, 0x22
+	DeathType_BURN_ALIVE, // 35, 0x23
+	DeathType_FEED_TO_BEASTS, // 36, 0x24
+	DeathType_HACK_TO_PIECES, // 37, 0x25
+	DeathType_LEAVE_OUT_IN_AIR, // 38, 0x26
+	DeathType_BOIL, // 39, 0x27
+	DeathType_MELT, // 40, 0x28
+	DeathType_CONDENSE, // 41, 0x29
+	DeathType_SOLIDIFY, // 42, 0x2A
+	DeathType_INFECTION, // 43, 0x2B
+	DeathType_MEMORIALIZE, // 44, 0x2C
+	DeathType_SCARE, // 45, 0x2D
+	DeathType_DARKNESS, // 46, 0x2E
+	DeathType_COLLAPSE, // 47, 0x2F
+	DeathType_DRAIN_BLOOD, // 48, 0x30
+	DeathType_SLAUGHTER, // 49, 0x31
+	DeathType_VEHICLE, // 50, 0x32
+	DeathType_FALLING_OBJECT, // 51, 0x33
+	DeathType_LEAPT_FROM_HEIGHT, // 52, 0x34
+	DeathType_DROWN_ALT2, // 53, 0x35
+	DeathType_EXECUTION_GENERIC, // 54, 0x36
+};
+]]
+
+-- curse_attr_change.h
+
+ffi.cdef[[
+typedef struct {
+	int32_t physAttPerc[6];
+	int32_t physAttAdd[6];
+	int32_t mentAttPerc[13];
+	int32_t mentAttAdd[13];
+} CurseAttrChange;
+]]
+
+-- unit_misc_traits.h
+
+-- TODO
+ffi.cdef'typedef struct UnitMiscTrait UnitMiscTrait;'
+makeVectorPtr'UnitMiscTrait'
+
+-- unit_soul.h
+
+-- TODO
+ffi.cdef'typedef struct UnitSoul UnitSoul;'
+makeVectorPtr'UnitSoul'
+
+-- unit_demand.h
+
+-- TODO
+ffi.cdef'typedef struct UnitDemand UnitDemand;'
+makeVectorPtr'UnitDemand'
+
+-- unit_item_wrestle.h
+
+-- TODO
+ffi.cdef'typedef struct UnitItemWrestle UnitItemWrestle;'
+makeVectorPtr'UnitItemWrestle'
+
+-- unit_complaint.h
+
+-- TODO
+ffi.cdef'typedef struct UnitComplaint UnitComplaint;'
+makeVectorPtr'UnitComplaint'
+
+-- unit_unk_138.h
+
+-- TODO
+ffi.cdef'typedef struct UnitUnknown138 UnitUnknown138;'
+makeVectorPtr'UnitUnknown138'
+
+-- unit_request.h
+
+-- TODO
+ffi.cdef'typedef struct UnitRequest UnitRequest;'
+makeVectorPtr'UnitRequest'
+
+-- unit_coin_debt.h
+
+-- TODO
+ffi.cdef'typedef struct UnitCoinDebt UnitCoinDebt;'
+makeVectorPtr'UnitCoinDebt'
+
+-- temperaturest.h
+
+-- TODO
+ffi.cdef'typedef struct Temperaturest Temperaturest;'
+makeVectorPtr'Temperaturest'
+
+-- tile_designation.h
+
+-- TODO
+ffi.cdef[[
+typedef union {
+	uint32_t flags;
+	struct {
+		uint32_t flow_size : 3; /*!< liquid amount */
+		uint32_t pile : 1; /*!< stockpile; Adventure: lit */
+		uint32_t/*df::tile_dig_designation*/ dig : 3; /*!< Adventure: line_of_sight, furniture_memory, item_memory */
+		uint32_t smooth : 2; /*!< Adventure: creature_memory, original_cave */
+		uint32_t hidden : 1;
+		uint32_t geolayer_index : 4;
+		uint32_t light : 1;
+		uint32_t subterranean : 1;
+		uint32_t outside : 1;
+		uint32_t biome : 4;
+		uint32_t/*df::tile_liquid*/ liquid_type : 1;
+		uint32_t water_table : 1; /*!< aquifer */
+		uint32_t rained : 1;
+		uint32_t/*df::tile_traffic*/ traffic : 2;
+		uint32_t flow_forbid : 1;
+		uint32_t liquid_static : 1;
+		uint32_t feature_local : 1;
+		uint32_t feature_global : 1;
+		uint32_t water_stagnant : 1;
+		uint32_t water_salt : 1;
+	};
+} TileDesignation;
+]]
+
+-- unit_syndrome.h
+
+-- TODO
+ffi.cdef'typedef struct UnitSyndrome UnitSyndrome;'
+makeVectorPtr'UnitSyndrome'
+
+-- unit_health_info.h
+
+-- TODO
+ffi.cdef'typedef struct UnitHealthInfo UnitHealthInfo;'
+
+-- unit_item_use.h
+
+-- TODO
+ffi.cdef'typedef struct UnitItemUse UnitItemUse;'
+makeVectorPtr'UnitItemUse'
+
+-- unit_appearance.h
+
+-- TODO
+ffi.cdef'typedef struct UnitAppearance UnitAppearance;'
+makeVectorPtr'UnitAppearance'
+
+-- witness_report.h
+
+-- TODO
+ffi.cdef'typedef struct WitnessReport WitnessReport;'
+makeVectorPtr'WitnessReport'
+
+-- entity_event.h
+
+-- TODO
+ffi.cdef'typedef struct EntityEvent EntityEvent;'
+makeVectorPtr'EntityEvent'
+
+-- army_controller.h
+
+ffi.cdef'typedef struct ArmyController ArmyController;'
+makeVectorPtr'ArmyController'
+
+-- occupation.h
+
+ffi.cdef'typedef struct Occupation Occupation;'
+makeVectorPtr'Occupation'
+
+
+
 -- unit.h
 
 -- TODO
@@ -1230,7 +1624,18 @@ ffi.cdef[[
 typedef struct UnitGhostInfo UnitGhostInfo;
 ]]
 makeVectorPtr'UnitInventoryItem'
-makeVectorPtr'Building'
+
+ffi.cdef[[
+typedef int16_t SoldierMood;
+enum {
+	SoldierMood_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	SoldierMood_MartialTrance, // 0, 0x0
+	SoldierMood_Enraged, // 1, 0x1
+	SoldierMood_Tantrum, // 2, 0x2
+	SoldierMood_Depressed, // 3, 0x3
+	SoldierMood_Oblivious, // 4, 0x4
+};
+]]
 
 ffi.cdef[[
 typedef uint8_t UnitMeetingState;
@@ -1240,6 +1645,43 @@ enum {
 	UnitMeetingState_DoMeeting = 2,
 	UnitMeetingState_LeaveMap = 3,
 };
+]]
+
+ffi.cdef[[
+typedef struct {
+	int32_t unk_1;
+	int32_t unk_2;
+	int32_t unk_3;
+	int32_t unk_4;
+	int16_t unk_5;
+	int16_t unk_6;
+	int16_t unk_7;
+} UnitStatusUnknown1;
+]]
+makeVectorPtr'UnitStatusUnknown1' 
+
+ffi.cdef[[
+typedef struct {
+	int32_t unk_sub1_1; /*!< checked if 0 while praying */
+	int32_t unk_sub1_2;
+	int32_t unk_sub1_3;
+	int32_t remaining; /*!< set when praying; counts down to 0 */
+	int32_t year;
+	int32_t year_tick;
+	union {
+		uint32_t flags;
+		struct {
+			uint32_t anon_1 : 1;
+		};
+	};
+	int32_t unk_sub1_8;
+	int32_t unk_sub1_9;
+} UnitEnemyUnknownv40Sub3_Unknown7_UnknownSub1;
+]]
+makeVectorPtr'UnitEnemyUnknownv40Sub3_Unknown7_UnknownSub1'
+
+ffi.cdef[[
+typedef int8_t UnitVisionCone[21][21];
 struct Unit {
 	void * vtable;	/* TODO */
 	LanguageName name;
@@ -1258,113 +1700,129 @@ struct Unit {
 		CoordPath path;
 	} path;
 
-	/* unit_flags1 */
-	uint32_t moveState : 1; /*!< Can the dwarf move or are they waiting for their movement timer */
-	uint32_t inactive : 1; /*!< Set for dead units and incoming/leaving critters that are alive but off-map */
-	uint32_t hasMood : 1; /*!< Currently in mood */
-	uint32_t hadMood : 1; /*!< Had a mood already */
-	uint32_t marauder : 1; /*!< wide class of invader/inside creature attackers */
-	uint32_t drowning : 1; /*!< Is currently drowning */
-	uint32_t merchant : 1; /*!< An active merchant */
-	uint32_t forest : 1; /*!< used for units no longer linked to merchant/diplomacy, they just try to leave mostly */
-	uint32_t left : 1; /*!< left the map */
-	uint32_t rider : 1; /*!< Is riding an another creature */
-	uint32_t incoming : 1;
-	uint32_t diplomat : 1;
-	uint32_t zombie : 1;
-	uint32_t skeleton : 1;
-	uint32_t canSwap : 1; /*!< Can swap tiles during movement (prevents multiple swaps) */
-	uint32_t onGround : 1; /*!< The creature is laying on the floor, can be conscious */
-	uint32_t projectile : 1; /*!< Launched into the air? Funny. */
-	uint32_t activeInvader : 1; /*!< Active invader (for organized ones) */
-	uint32_t hiddenInAmbush : 1;
-	uint32_t invaderOrigin : 1; /*!< Invader origin (could be inactive and fleeing) */
-	uint32_t coward : 1; /*!< Will flee if invasion turns around */
-	uint32_t hiddenAmbusher : 1; /*!< Active marauder/invader moving inward? */
-	uint32_t invades : 1; /*!< Marauder resident/invader moving in all the way */
-	uint32_t checkFlows : 1; /*!< Check against flows next time you get a chance */
-	uint32_t ridden : 1;
-	uint32_t caged : 1;
-	uint32_t tame : 1;
-	uint32_t chained : 1;
-	uint32_t royalGuard : 1;
-	uint32_t fortressGuard : 1;
-	uint32_t suppressWield : 1;
-	uint32_t importantHistoricalFigure : 1; /*!< Is an important historical figure */
+	union {
+		uint32_t flags1;
+		struct {
+			uint32_t moveState : 1; /*!< Can the dwarf move or are they waiting for their movement timer */
+			uint32_t inactive : 1; /*!< Set for dead units and incoming/leaving critters that are alive but off-map */
+			uint32_t hasMood : 1; /*!< Currently in mood */
+			uint32_t hadMood : 1; /*!< Had a mood already */
+			uint32_t marauder : 1; /*!< wide class of invader/inside creature attackers */
+			uint32_t drowning : 1; /*!< Is currently drowning */
+			uint32_t merchant : 1; /*!< An active merchant */
+			uint32_t forest : 1; /*!< used for units no longer linked to merchant/diplomacy, they just try to leave mostly */
+			uint32_t left : 1; /*!< left the map */
+			uint32_t rider : 1; /*!< Is riding an another creature */
+			uint32_t incoming : 1;
+			uint32_t diplomat : 1;
+			uint32_t zombie : 1;
+			uint32_t skeleton : 1;
+			uint32_t canSwap : 1; /*!< Can swap tiles during movement (prevents multiple swaps) */
+			uint32_t onGround : 1; /*!< The creature is laying on the floor, can be conscious */
+			uint32_t projectile : 1; /*!< Launched into the air? Funny. */
+			uint32_t activeInvader : 1; /*!< Active invader (for organized ones) */
+			uint32_t hiddenInAmbush : 1;
+			uint32_t invaderOrigin : 1; /*!< Invader origin (could be inactive and fleeing) */
+			uint32_t coward : 1; /*!< Will flee if invasion turns around */
+			uint32_t hiddenAmbusher : 1; /*!< Active marauder/invader moving inward? */
+			uint32_t invades : 1; /*!< Marauder resident/invader moving in all the way */
+			uint32_t checkFlows : 1; /*!< Check against flows next time you get a chance */
+			uint32_t ridden : 1;
+			uint32_t caged : 1;
+			uint32_t tame : 1;
+			uint32_t chained : 1;
+			uint32_t royalGuard : 1;
+			uint32_t fortressGuard : 1;
+			uint32_t suppressWield : 1;
+			uint32_t importantHistoricalFigure : 1; /*!< Is an important historical figure */
+		};
+	};
 
-	/* unit_flags2 */
-	uint32_t swimming : 1;
-	uint32_t sparring : 1; /*!< works, but not set for sparring military dwarves(?) (since 0.40.01?) */
-	uint32_t noNotify : 1; /*!< Do not notify about level gains (for embark etc) */
-	uint32_t unused : 1;
-	uint32_t calculatedNerves : 1;
-	uint32_t calculatedBodyParts : 1;
-	uint32_t importantHistoricalFigure : 1; /*!< Is important historical figure (slight variation) */
-	uint32_t killed : 1; /*!< Has been killed by kill function (slightly different from dead, not necessarily violent death) */
-	uint32_t cleanup1 : 1; /*!< Must be forgotten by forget function (just cleanup) */
-	uint32_t cleanup2 : 1; /*!< Must be deleted (cleanup) */
-	uint32_t cleanup3 : 1; /*!< Recently forgotten (cleanup) */
-	uint32_t forTrade : 1; /*!< Offered for trade */
-	uint32_t tradeResolved : 1;
-	uint32_t hasBreaks : 1;
-	uint32_t gutted : 1;
-	uint32_t circulatorySpray : 1;
-	uint32_t lockedInForTrading : 1; /*!< Locked in for trading (it's a projectile on the other set of flags, might be what the flying was) */
-	uint32_t slaughter : 1; /*!< marked for slaughter */
-	uint32_t underworld : 1; /*!< Underworld creature */
-	uint32_t resident : 1; /*!< Current resident */
-	uint32_t cleanup4 : 1; /*!< Marked for special cleanup as unused load from unit block on disk */
-	uint32_t calculatedInsulation : 1; /*!< Insulation from clothing calculated */
-	uint32_t visitorUninvited : 1; /*!< Uninvited guest */
-	uint32_t visitor : 1;
-	uint32_t calculatedInventory : 1; /*!< Inventory order calculated */
-	uint32_t visionGood : 1; /*!< Vision -- have good part */
-	uint32_t visionDamaged : 1; /*!< Vision -- have damaged part */
-	uint32_t visionMissing : 1; /*!< Vision -- have missing part */
-	uint32_t breathingGood : 1; /*!< Breathing -- have good part */
-	uint32_t breathingProblem : 1; /*!< Breathing -- having a problem */
-	uint32_t roamingWildernessPopulationSource : 1;
-	uint32_t roamingWildernessPopulationSourceNotAMapFeature : 1;
+	union {
+		uint32_t flags2;
+		struct {
+			uint32_t swimming : 1;
+			uint32_t sparring : 1; /*!< works, but not set for sparring military dwarves(?) (since 0.40.01?) */
+			uint32_t noNotify : 1; /*!< Do not notify about level gains (for embark etc) */
+			uint32_t unused : 1;
+			uint32_t calculatedNerves : 1;
+			uint32_t calculatedBodyParts : 1;
+			uint32_t importantHistoricalFigure : 1; /*!< Is important historical figure (slight variation) */
+			uint32_t killed : 1; /*!< Has been killed by kill function (slightly different from dead, not necessarily violent death) */
+			uint32_t cleanup1 : 1; /*!< Must be forgotten by forget function (just cleanup) */
+			uint32_t cleanup2 : 1; /*!< Must be deleted (cleanup) */
+			uint32_t cleanup3 : 1; /*!< Recently forgotten (cleanup) */
+			uint32_t forTrade : 1; /*!< Offered for trade */
+			uint32_t tradeResolved : 1;
+			uint32_t hasBreaks : 1;
+			uint32_t gutted : 1;
+			uint32_t circulatorySpray : 1;
+			uint32_t lockedInForTrading : 1; /*!< Locked in for trading (it's a projectile on the other set of flags, might be what the flying was) */
+			uint32_t slaughter : 1; /*!< marked for slaughter */
+			uint32_t underworld : 1; /*!< Underworld creature */
+			uint32_t resident : 1; /*!< Current resident */
+			uint32_t cleanup4 : 1; /*!< Marked for special cleanup as unused load from unit block on disk */
+			uint32_t calculatedInsulation : 1; /*!< Insulation from clothing calculated */
+			uint32_t visitorUninvited : 1; /*!< Uninvited guest */
+			uint32_t visitor : 1;
+			uint32_t calculatedInventory : 1; /*!< Inventory order calculated */
+			uint32_t visionGood : 1; /*!< Vision -- have good part */
+			uint32_t visionDamaged : 1; /*!< Vision -- have damaged part */
+			uint32_t visionMissing : 1; /*!< Vision -- have missing part */
+			uint32_t breathingGood : 1; /*!< Breathing -- have good part */
+			uint32_t breathingProblem : 1; /*!< Breathing -- having a problem */
+			uint32_t roamingWildernessPopulationSource : 1;
+			uint32_t roamingWildernessPopulationSourceNotAMapFeature : 1;
+		};
+	};
 
-	/* unit_flags3 */
-	uint32_t bodyPartRelsizeComputed : 1;
-	uint32_t sizeModifierComputed : 1;
-	uint32_t stuckWeaponComputed : 1; /*!< cleared if removing StuckIn item to recompute wound flags. */
-	uint32_t computeHealth : 1; /*!< causes the health structure to be created or updated */
-	uint32_t announceTitan : 1; /*!< Announces creature like an FB or titan. */
-	uint32_t unk_3_5 : 1;
-	uint32_t onCrutch : 1;
-	uint32_t weightComputed : 1;
-	uint32_t bodyTempInRange : 1; /*!< Is set to 1 every tick for non-dead creatures. */
-	uint32_t waitUntilReveal : 1; /*!< Blocks all kind of things until tile is revealed. */
-	uint32_t scuttle : 1;
-	uint32_t unk_3_11 : 1;
-	uint32_t ghostly : 1;
-	uint32_t unk_3_13 : 1;
-	uint32_t unk_3_14 : 1;
-	uint32_t unk_3_15 : 1; /*!< dropped when znew >= zold */
-	uint32_t unk_3_16 : 1; /*!< something to do with werewolves? */
-	uint32_t noMeandering : 1; /*!< for active_invaders */
-	uint32_t floundering : 1;
-	uint32_t exitVehicle1 : 1; /*!< trapavoid */
-	uint32_t exitVehicle2 : 1; /*!< trapavoid */
-	uint32_t dangerousTerrain : 1;
-	uint32_t advYield : 1;
-	uint32_t visionConeSet : 1;
-	uint32_t unk_3_24 : 1;
-	uint32_t emotionallyOverloaded : 1; /*!< since v0.40.01 */
-	uint32_t unk_3_26 : 1;
-	uint32_t availableForAdoption : 1;
-	uint32_t gelded : 1;
-	uint32_t markedForGelding : 1;
-	uint32_t injuryThought : 1;
-	uint32_t unk_3_31 : 1; /*!< causes No Activity to be displayed */
+	union {
+		uint32_t flags3;
+		struct {
+			uint32_t bodyPartRelsizeComputed : 1;
+			uint32_t sizeModifierComputed : 1;
+			uint32_t stuckWeaponComputed : 1; /*!< cleared if removing StuckIn item to recompute wound flags. */
+			uint32_t computeHealth : 1; /*!< causes the health structure to be created or updated */
+			uint32_t announceTitan : 1; /*!< Announces creature like an FB or titan. */
+			uint32_t unk_3_5 : 1;
+			uint32_t onCrutch : 1;
+			uint32_t weightComputed : 1;
+			uint32_t bodyTempInRange : 1; /*!< Is set to 1 every tick for non-dead creatures. */
+			uint32_t waitUntilReveal : 1; /*!< Blocks all kind of things until tile is revealed. */
+			uint32_t scuttle : 1;
+			uint32_t unk_3_11 : 1;
+			uint32_t ghostly : 1;
+			uint32_t unk_3_13 : 1;
+			uint32_t unk_3_14 : 1;
+			uint32_t unk_3_15 : 1; /*!< dropped when znew >= zold */
+			uint32_t unk_3_16 : 1; /*!< something to do with werewolves? */
+			uint32_t noMeandering : 1; /*!< for active_invaders */
+			uint32_t floundering : 1;
+			uint32_t exitVehicle1 : 1; /*!< trapavoid */
+			uint32_t exitVehicle2 : 1; /*!< trapavoid */
+			uint32_t dangerousTerrain : 1;
+			uint32_t advYield : 1;
+			uint32_t visionConeSet : 1;
+			uint32_t unk_3_24 : 1;
+			uint32_t emotionallyOverloaded : 1; /*!< since v0.40.01 */
+			uint32_t unk_3_26 : 1;
+			uint32_t availableForAdoption : 1;
+			uint32_t gelded : 1;
+			uint32_t markedForGelding : 1;
+			uint32_t injuryThought : 1;
+			uint32_t unk_3_31 : 1; /*!< causes No Activity to be displayed */
+		};
+	};
 
-	/* unit_flags4 */
-	uint32_t unk_4_0 : 1;
-	uint32_t unk_4_1 : 1;
-	uint32_t unk_4_2 : 1;
-	uint32_t unk_4_3 : 1;
+	union {
+		uint32_t flags4;
+		struct {
+			uint32_t unk_4_0 : 1;
+			uint32_t unk_4_1 : 1;
+			uint32_t unk_4_2 : 1;
+			uint32_t unk_4_3 : 1;
+		};
+	};
 
 	struct {
 		UnitMeetingState state;	/* UnitMeetingState_* */
@@ -1451,9 +1909,412 @@ struct Unit {
 	vector_int tradedItems; /*!< items brought to trade depot */
 	vector_Building_ptr ownedBuildings;
 	vector_int corpseParts; /*!< entries remain even when items are destroyed */
+
+	struct {
+		int32_t account;
+		int32_t satisfaction; /*!< amount earned recently for jobs */
+		Unit * huntTarget;
+		int32_t unk_v4305_1;
+		Building * destroyTarget;
+		int32_t unk_v40_1; /*!< since v0.40.01 */
+		int32_t unk_v40_2; /*!< since v0.40.01 */
+		int32_t unk_v40_3; /*!< since v0.40.01 */
+		int32_t unk_v40_4; /*!< since v0.40.01 */
+		int8_t unk_v40_5; /*!< since v0.40.01 */
+		int32_t gaitBuildUp;
+		Coord climbHold;
+		int32_t unk_v4014_1; /*!< since v0.40.14 */
+		Job * currentJob; /*!< df_job */
+		JobSkill moodSkill; /*!< can be uninitialized for children and animals */
+		int32_t moodTimeout; /*!< counts down from 50000, insanity upon reaching zero */
+		int32_t unk_39c;
+	} job;
+	
+	struct {
+		BodyComponentInfo components;
+		vector_UnitWound_ptr wounds;
+		int32_t woundNextID;
+		int32_t unk_39c[10];
+		CasteBodyInfo * bodyPlan;
+		int16_t weaponBP;
+		UnitAttribute physicalAttrs[6];
+		BodySizeInfo sizeInfo;
+		uint32_t bloodMax;
+		uint32_t bloodCount;
+		int32_t infectionLevel; /*!< GETS_INFECTIONS_FROM_ROT sets; DISEASE_RESISTANCE reduces; >=300 causes bleeding */
+		vector_Spatter_ptr spatters;
+	} body;
+	
+	struct {
+		vector_int body_modifiers;
+		vector_int bp_modifiers;
+		int32_t size_modifier; /*!< product of all H/B/LENGTH body modifiers, in % */
+		vector_short tissue_style;
+		vector_int tissue_style_civ_id;
+		vector_int tissue_style_id;
+		vector_int tissue_style_type;
+		vector_int tissue_length; /*!< description uses bp_modifiers[style_list_idx[index] ] */
+		UnitGenes genes;
+		vector_int colors;
+	} appearance;
+	
+	vector_UnitAction_ptr actions;
+	int32_t nextActionID;
+	
+	struct {
+		int32_t thinkCounter;
+		int32_t jobCounter;
+		int32_t swapCounter; /*!< dec per job_counter reroll, can_swap if 0 */
+		DeathType deathCause;
+		int32_t deathID;
+		int16_t winded;
+		int16_t stunned;
+		int16_t unconscious;
+		int16_t suffocation; /*!< counts up while winded, results in death */
+		int16_t webbed;
+		Coord gutsTrail1;
+		Coord gutsTrail2;
+		int16_t soldierMoodCountdown; /*!< plus a random amount */
+		SoldierMood soldierMood;
+		uint32_t pain;
+		uint32_t nausea;
+		uint32_t dizziness;
+	} counters;
+	
+	struct {
+		int32_t unk_0; /*!< moved from end of counters in 0.43.05 */
+		CIEAddTagMask1 addTags1;
+		CIEAddTagMask1 remTags1;
+		CIEAddTagMask2 addTags2;
+		CIEAddTagMask2 remTags2;
+		bool nameVisible; /*!< since v0.34.01 */
+		std_string name; /*!< since v0.34.01 */
+		std_string namePlural; /*!< since v0.34.01 */
+		std_string nameAdjective; /*!< since v0.34.01 */
+		uint32_t symAndColor1; /*!< since v0.34.01 */
+		uint32_t symAndColor2; /*!< since v0.34.01 */
+		uint32_t flashPeriod; /*!< since v0.34.01 */
+		uint32_t flashTime2; /*!< since v0.34.01 */
+		vector_int body_appearance;
+		vector_int bp_appearance; /*!< since v0.34.01; guess! */
+		uint32_t speed_add; /*!< since v0.34.01 */
+		uint32_t speed_mul_percent; /*!< since v0.34.01 */
+		CurseAttrChange * attr_change; /*!< since v0.34.01 */
+		uint32_t luck_mul_percent; /*!< since v0.34.01 */
+		int32_t unk_98; /*!< since v0.42.01 */
+		vector_int interaction_id; /*!< since v0.34.01 */
+		vector_int interaction_time; /*!< since v0.34.01 */
+		vector_int interaction_delay; /*!< since v0.34.01 */
+		int32_t time_on_site; /*!< since v0.34.01 */
+		vector_int own_interaction; /*!< since v0.34.01 */
+		vector_int own_interaction_delay; /*!< since v0.34.01 */
+	} curse;
+	
+	struct T_counters2 {
+		uint32_t paralysis;
+		uint32_t numbness;
+		uint32_t fever;
+		uint32_t exhaustion;
+		uint32_t hungerTimer;
+		uint32_t thirstTimer;
+		uint32_t sleepinessTimer;
+		uint32_t stomachContent;
+		uint32_t stomachFood;
+		uint32_t vomitTimeout; /*!< blocks nausea causing vomit */
+		uint32_t storedFat; /*!< hunger leads to death only when 0 */
+	} counters2;
+	
+	struct {
+		vector_UnitMiscTrait_ptr miscTraits;
+		struct {
+			struct {
+				vector_ItemType item_type;
+				vector_short item_subtype;
+				MaterialVecRef material;
+				vector_int year;
+				vector_int yearTime;
+			} food;
+			struct {
+				vector_ItemType item_type;
+				vector_short itemSubType;
+				MaterialVecRef material;
+				vector_int year;
+				vector_int yearTime;
+			} drink;
+		} * eat_history;
+		int32_t demandTimeout;
+		int32_t mandateTimeout;
+		vector_int attackerIDs;
+		vector_short attackerCountdown;
+		uint8_t faceDirection; /*!< for wagons */
+		LanguageName artifact_name;
+		vector_UnitSoul_ptr souls;
+		UnitSoul * current_soul;
+		vector_UnitDemand_ptr demands;
+		bool labors[94];
+		vector_UnitItemWrestle_ptr wrestle_items;
+		vector_int observedTraps;
+		vector_UnitComplaint_ptr complaints;
+		vector_UnitUnknown138_ptr unk_138; /*!< since v0.44.01 */
+		vector_UnitRequest_ptr requests;
+		vector_UnitCoinDebt_ptr coinDebts;
+		vector_UnitStatusUnknown1_ptr unk_1; /*!< since v0.47.01 */
+		int32_t unk_2; /*!< since v0.47.01 */
+		int32_t unk_3; /*!< since v0.47.01 */
+		int32_t unk_4[5]; /*!< since v0.47.01; initialized together with enemy.gait_index */
+		int32_t unk_5; /*!< since v0.47.01 */
+		int16_t adv_sleep_timer;
+		Coord recent_job_area;
+		CoordPath recent_jobs;
+	} status;
+	
+	int32_t histFigureID;
+	int32_t histFigureID2; /*!< used for ghost in AttackedByDead thought */
+	struct {
+		int16_t limbsStandMax;
+		int16_t limbsStandCount;
+		int16_t limbsGraspMax;
+		int16_t limbsGraspCount;
+		int16_t limbsFlyMax;
+		int16_t limbsFlyCount;
+		vector_Temperaturest_ptr bodyPartTemperature;
+		uint32_t addPathFlags; /*!< pathing flags to OR, set to 0 after move */
+		TileDesignation liquidType;
+		uint8_t liquidDepth;
+		int32_t histEventColID; /*!< linked to an active invasion or kidnapping */
+	} status2;
+	
+	struct {
+		vector_int unk_7c4;
+		vector_int unk_c; /*!< since v0.34.01 */
+	} unknown7;
+	
+	struct {
+		vector_UnitSyndrome_ptr active;
+		vector_int reinfectionType;
+		vector_short reinfectionCount;
+	} syndromes;
+	
+	struct {
+		vector_int log[3];
+		int32_t last_year[3];
+		int32_t last_year_tick[3];
+	} reports;
+	
+	UnitHealthInfo * health;
+	vector_UnitItemUse_ptr usedItems; /*!< Contains worn clothes, armor, weapons, arrows fired by archers */
+	
+	struct {
+		vector_int sound_cooldown; /*!< since v0.34.01 */
+		struct {
+			int32_t unk_1;
+			int32_t unk_2;
+			int32_t unk_3;
+			int32_t unk_4;
+			int32_t unk_5;
+			int32_t unk_6; /*!< since v0.47.01 */
+			int16_t rootBodyPartID; /*!< ID of the root body part in the corpse or corpse piece from which the reanimated unit was produced */
+			std_string undeadName; /*!< display name of reanimated creatures */
+			int32_t unk_v43_1; /*!< since v0.43.01 */
+			int32_t unk_v43_2; /*!< since v0.43.01 */
+		} * undead; /*!< since v0.34.01 */
+		
+		int32_t wereRace;
+		int32_t wereCaste;
+		int32_t normalRace;
+		int32_t normalCaste;
+		int32_t interaction; /*!< since v0.34.01; is set when a RETRACT_INTO_BP interaction is active */
+		vector_UnitAppearance_ptr appearances;
+		vector_WitnessReport_ptr witnessReports;
+		vector_EntityEvent_ptr unk_a5c;
+		int32_t gaitIndex[5];
+		int32_t unk_unit_id_1[10]; /*!< since v0.40.01; number of non -1 entries control linked contents in following 4 vectors, rotating */
+		int32_t unk_v40_1b[10]; /*!< since v0.40.01 */
+		int32_t unk_v40_1c[10]; /*!< since v0.40.01; unused elements probably uninitialized */
+		int32_t unk_v40_1d[10]; /*!< since v0.40.01; unused elements probably uninitialized */
+		int32_t unk_v40_1e[10]; /*!< since v0.40.01; unused elements probably uninitialized */
+		int32_t unk_unit_id_2[200]; /*!< since v0.40.01; Seen own side, enemy side, not involved (witnesses?). Unused fields not cleared */
+		int32_t unk_unit_id_2_count; /*!< since v0.40.01 */
+		
+		struct {
+			int32_t unk_1;
+			int32_t unk_2;
+			int32_t unk_3;
+			struct {
+				int32_t unk_1;
+				int32_t unk_2;
+				int32_t unk_3;
+				int32_t unk_4;
+				int32_t unk_5;
+				int32_t unk_6;
+				int32_t unk_7;
+				int32_t unk_8;
+				int32_t unk_9;
+				int32_t unk_10; /*!< not saved */
+			} unk;
+		} * unk_448; /*!< since v0.40.01 */
+		
+		struct {
+			int32_t unk_1;
+			int32_t unk_2;
+			int16_t unk_3;
+			int32_t unk_4;
+			int32_t unk_5;
+			int32_t unk_6;
+			int32_t unk_7[20];
+			int32_t unk_8[20];
+			int16_t unk_9;
+			int16_t unk_10;
+			int32_t unk_11;
+			int32_t unk_12;
+		} * unk_44c; /*!< since v0.40.01 */
+		
+		int32_t unk_450; /*!< since v0.40.01 */
+		int32_t unk_454; /*!< since v0.40.01 */
+		int32_t army_controller_id; /*!< since v0.40.01 */
+		
+		/**
+		 * Since v0.40.01
+		 */
+		struct {
+			ArmyController * controller; /*!< since v0.40.01 */
+			struct {
+				vector_int unk_1;
+				vector_int unk_2;
+				vector_int unk_3;
+				vector_int unk_4;
+			} * unk_2; /*!< since v0.40.01 */
+			vector_int unk_3; /*!< since v0.40.01 */
+			vector_int unk_4; /*!< since v0.40.01 */
+			vector_int unk_5; /*!< since v0.40.01 */
+			struct {
+				vector_int unk_0;
+				vector_int unk_10;
+			} * unk_6;
+			struct {
+				vector_UnitEnemyUnknownv40Sub3_Unknown7_UnknownSub1_ptr unk_sub1;
+				union {
+					uint32_t flags;
+					struct {
+						uint32_t anon_1 : 1;
+						uint32_t anon_2 : 1;
+					};
+				} unk_1;
+				int32_t year;
+				int32_t year_tick;
+				int32_t unk_4;
+				int32_t unk_5;
+				int32_t unk_6;
+				int32_t unk_7;
+			} * unk_7; /*!< since v0.42.01 */
+		} unk_v40_sub3; /*!< since v0.40.01 */
+		int32_t combat_side_id;
+		dfarray_bit/*CasteRawFlags*/ casteFlags; /*!< since v0.44.06 */
+		int32_t enemyStatusSlot;
+		int32_t unk_874_cntr;
+		vector_byte body_part_878;
+		vector_byte body_part_888;
+		vector_int body_part_relsize; /*!< with modifiers */
+		vector_byte body_part_8a8;
+		vector_ushort body_part_base_ins;
+		vector_ushort body_part_clothing_ins;
+		vector_ushort body_part_8d8;
+		vector_int unk_8e8;
+		vector_ushort unk_8f8;
+	} enemy;
+	
+	vector_int healing_rate;
+	int32_t effective_rate;
+	int32_t tendons_heal;
+	int32_t ligaments_heal;
+	int32_t weight;
+	int32_t weight_fraction; /*!< 1e-6 */
+	vector_int burrows;
+	UnitVisionCone* vision_cone;
+	vector_Occupation_ptr occupations; /*!< since v0.42.01 */
+	std_string adjective; /*!< from physical descriptions for use in adv */
+
 };
 typedef struct Unit Unit;
 ]]
+
+do
+	local mt = {}
+	mt.__index = mt
+
+	function mt:isDead()
+		assert(self ~= nil, "self is nil")
+		return self.killed ~= 0
+			or self.ghostly ~= 0
+	end
+
+	function mt:isOpposedToLife()
+		assert(self ~= nil, "self is nil")
+		if self.curse.rem_tags1.OPPOSED_TO_LIFE then
+			return false
+		end
+		if self.curse.add_tags1.bits.OPPOSED_TO_LIFE then
+			return true
+		end
+		return casteFlagSet(
+			self.race,
+			self.caste,
+			CasteRawFlags_OPPOSED_TO_LIFE
+		)
+	end
+
+
+	function mt:isSane()
+		assert(self ~= nil, "self is nil")
+	
+		if self:isDead() 
+		or self:isOpposedToLife() 
+		or self.enemy.undead
+		then
+			return false
+		end
+
+		if self.enemy.normalRace == self.enemy.wereRace 
+		and self:isCrazed()
+		then
+			return false
+		end
+		
+		if self.mood == MoodType_Melancholy
+		or self.mood == MoodType_Raving
+		or self.mood == MoodType_Berserk
+		then
+			return false;
+		end
+
+		return true
+	end
+
+	function mt:isCitizen(ignoreSanity)
+		assert(self ~= nil, "self is nil")
+
+		if self.marauder ~= 0
+		or self.invaderOrigin ~= 0
+		or self.activeInvader ~= 0
+		or self.forest ~= 0
+		or self.merchant ~= 0
+		or self.diplomat ~= 0
+		or self.visitor ~= 0
+		or self.visitorUninvited ~= 0
+		or self.underworld ~= 0
+		or self.resident ~= 0
+		then
+			return false
+		end
+	
+		if not (ignoreSanity or self:isSane()) then
+			return false
+		end
+
+		return self:isOwnGroup(unit)
+	end
+	ffi.metatype('Unit', mt)
+end
 
 -- item.h
 
@@ -1463,46 +2324,54 @@ typedef struct {
 
 	Coord pos;
 
-	/* item_flags */
-	uint32_t onGround : 1; /*!< Item on ground */
-	uint32_t inJob : 1; /*!< Item currently being used in a job */
-	uint32_t hostile : 1; /*!< Item owned by hostile */
-	uint32_t inInventory : 1; /*!< Item in a creature, workshop or container inventory */
-	uint32_t removed : 1; /*!< completely invisible and with no position */
-	uint32_t inBuilding : 1; /*!< Part of a building (including mechanisms, bodies in coffins) */
-	uint32_t container : 1; /*!< Set on anything that contains or contained items? */
-	uint32_t deadDwarf : 1; /*!< Dwarfs dead body or body part */
-	uint32_t rotten : 1; /*!< Rotten food */
-	uint32_t spiderWeb : 1; /*!< Thread in spider web */
-	uint32_t construction : 1; /*!< Material used in construction */
-	uint32_t encased : 1; /*!< Item encased in ice or obsidian */
-	uint32_t unk_1_12 : 1; /*!< unknown, unseen */
-	uint32_t murder : 1; /*!< Implies murder - used in fell moods */
-	uint32_t foreign : 1; /*!< Item is imported */
-	uint32_t trader : 1; /*!< Item ownwed by trader */
-	uint32_t owned : 1; /*!< Item is owned by a dwarf */
-	uint32_t garbage_collect : 1; /*!< Marked for deallocation by DF it seems */
-	uint32_t artifact : 1; /*!< Artifact */
-	uint32_t forbid : 1; /*!< Forbidden item */
-	uint32_t alreadyUncategorized : 1; /*!< unknown, unseen */
-	uint32_t dump : 1; /*!< Designated for dumping */
-	uint32_t onFire : 1; /*!< Indicates if item is on fire, Will Set Item On Fire if Set! */
-	uint32_t melt : 1; /*!< Designated for melting, if applicable */
-	uint32_t hidden : 1; /*!< Hidden item */
-	uint32_t inChest : 1; /*!< Stored in chest/part of well? */
-	uint32_t useRecorded : 1; /*!< transient in unit.used_items update */
-	uint32_t artifact_mood : 1; /*!< created by mood/named existing item */
-	uint32_t tempsComputed : 1; /*!< melting/boiling/ignite/etc. points */
-	uint32_t weightComputed : 1;
-	uint32_t unk_1_30 : 1; /*!< unknown, unseen */
-	uint32_t fromWorldgen : 1; /*!< created by underground critters? */
+	union {
+		uint32_t flags;
+		struct {
+			uint32_t onGround : 1; /*!< Item on ground */
+			uint32_t inJob : 1; /*!< Item currently being used in a job */
+			uint32_t hostile : 1; /*!< Item owned by hostile */
+			uint32_t inInventory : 1; /*!< Item in a creature, workshop or container inventory */
+			uint32_t removed : 1; /*!< completely invisible and with no position */
+			uint32_t inBuilding : 1; /*!< Part of a building (including mechanisms, bodies in coffins) */
+			uint32_t container : 1; /*!< Set on anything that contains or contained items? */
+			uint32_t deadDwarf : 1; /*!< Dwarfs dead body or body part */
+			uint32_t rotten : 1; /*!< Rotten food */
+			uint32_t spiderWeb : 1; /*!< Thread in spider web */
+			uint32_t construction : 1; /*!< Material used in construction */
+			uint32_t encased : 1; /*!< Item encased in ice or obsidian */
+			uint32_t unk_1_12 : 1; /*!< unknown, unseen */
+			uint32_t murder : 1; /*!< Implies murder - used in fell moods */
+			uint32_t foreign : 1; /*!< Item is imported */
+			uint32_t trader : 1; /*!< Item ownwed by trader */
+			uint32_t owned : 1; /*!< Item is owned by a dwarf */
+			uint32_t garbage_collect : 1; /*!< Marked for deallocation by DF it seems */
+			uint32_t artifact : 1; /*!< Artifact */
+			uint32_t forbid : 1; /*!< Forbidden item */
+			uint32_t alreadyUncategorized : 1; /*!< unknown, unseen */
+			uint32_t dump : 1; /*!< Designated for dumping */
+			uint32_t onFire : 1; /*!< Indicates if item is on fire, Will Set Item On Fire if Set! */
+			uint32_t melt : 1; /*!< Designated for melting, if applicable */
+			uint32_t hidden : 1; /*!< Hidden item */
+			uint32_t inChest : 1; /*!< Stored in chest/part of well? */
+			uint32_t useRecorded : 1; /*!< transient in unit.used_items update */
+			uint32_t artifact_mood : 1; /*!< created by mood/named existing item */
+			uint32_t tempsComputed : 1; /*!< melting/boiling/ignite/etc. points */
+			uint32_t weightComputed : 1;
+			uint32_t unk_1_30 : 1; /*!< unknown, unseen */
+			uint32_t fromWorldgen : 1; /*!< created by underground critters? */
+		};
+	};
 
-	/* item_flags2 */
-	uint32_t hasRider : 1; /*!< vehicle with a rider */
-	uint32_t unk_2_1 : 1;
-	uint32_t grown : 1;
-	uint32_t unkBook : 1; /*!< possibly book/written-content-related */
-	uint32_t anon_1 : 1;
+	union {
+		uint32_t flags2;
+		struct {
+			uint32_t hasRider : 1; /*!< vehicle with a rider */
+			uint32_t unk_2_1 : 1;
+			uint32_t grown : 1;
+			uint32_t unkBook : 1; /*!< possibly book/written-content-related */
+			uint32_t anon_1 : 1;
+		};
+	};
 
 	uint32_t age;
 	int32_t id;
@@ -1757,6 +2626,7 @@ typedef struct {
 	int32_t unk_v40_3; /*!< since v0.40.01 */
 } Building;
 ]]
+makeVectorPtr'Building'
 
 -- projectile.h
 
@@ -1904,11 +2774,6 @@ makeVectorPtr'Vehicle'
 
 ffi.cdef'typedef struct Army Army;'
 makeVectorPtr'Army'
-
--- army_controller.h
-
-ffi.cdef'typedef struct ArmyController ArmyController;'
-makeVectorPtr'ArmyController'
 
 -- cultural_identity.h
 
@@ -2447,12 +3312,16 @@ typedef struct {
 	} matTable;
 
 	struct {
+		// first two fields match MaterialVecRef
 		vector_short matTypes;
 		vector_int matIndexes;
 		vector_int interactions;
 		vector_Syndrome_ptr all; /*!< since v0.34.01 */
 	} syndromes;
+	
 	struct {
+		// first two fields match MaterialVecRef
+		// first three fields matches syndromes
 		vector_short matTypes;
 		vector_int matIndexes;
 		vector_int interactions;
@@ -2524,7 +3393,7 @@ typedef struct {
 	int16_t unk_8a;
 	int16_t unk_v34_2; /*!< since v0.34.01 */
 	int16_t unk_v34_3; /*!< since v0.34.01 */
-	struct T_unk_b4 {
+	struct {
 		int32_t world_width2;
 		int32_t world_height2;
 		uint32_t * unk_1; /*!< align(width,4)*height */
@@ -2614,7 +3483,7 @@ typedef struct {
 	int32_t unk_270;
 	vector_WorldDataUnknown274_ptr unk_274;
 /*!< since v0.40.01 */
-	struct T_unk_482f8 {
+	struct {
 		int32_t unk_1[320000];
 		int32_t unk_2;
 		int32_t unk_3;
@@ -3110,18 +3979,10 @@ Item_cheesest
 Item_foodst
 Item_ballistaarrowheadst
 ArtifactRecord
-Building
-Building
 Building_stockpilest
 Building_civzonest
 Building_civzonest
 Building_actual
-Building
-Building
-Building
-Building
-Building
-Building
 Building_boxst
 Building_cabinetst
 Building_trapst
@@ -3132,7 +3993,6 @@ Building_grate_wallst
 Building_grate_floorst
 Building_bars_verticalst
 Building_bars_floorst
-Building
 Building_wellst
 Building_tablest
 Building_bridgest
@@ -3147,7 +4007,6 @@ Building_wagonst
 Building_shopst
 Building_bedst
 Building_traction_benchst
-Building
 Building_farmplotst
 Building_gear_assemblyst
 Building_rollersst
@@ -3941,8 +4800,8 @@ typedef struct {
 
 /*!< since v0.40.01: */
 	struct {
-		vector_short/*JobSkill*/ primary[Num_Profession];
-		vector_short/*JobSkill*/ secondary[Num_Profession];
+		vector_JobSkill primary[Num_Profession];
+		vector_JobSkill secondary[Num_Profession];
 	} professionSkills;
 
 	struct {
@@ -4178,14 +5037,11 @@ typedef struct {
 		vector_ptr unk_vec2;
 		vector_ptr unk_vec3;
 		struct {
-			vector_short/*JobSkill*/ skills;
+			vector_JobSkill skills;
 			vector_int skill_levels;
-			vector_short/*ItemType*/ itemTypes;
+			vector_ItemType itemTypes;
 			vector_short itemSubTypes;
-			struct {
-				vector_short matType;
-				vector_int matIndex;
-			} itemMaterials;
+			MaterialVecRef itemMaterials;
 			vector_int itemCounts;
 		} equipment;
 		int32_t side;
