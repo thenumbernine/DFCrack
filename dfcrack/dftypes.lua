@@ -1439,5 +1439,250 @@ typedef struct {
 	vector_ManagerOrder_ptr managerOrders;
 	int32_t managerOrderNextID;
 	vector_Mandate_ptr mandates;
+
+	struct {
+		vector_HistoricalEntity_ptr all, bad;
+	} entities;
+
+	struct {
+		Coord2D slots[20000];
+		int16_t nextSlot;
+	} worldgenCoordBuf;
+
+	struct {
+		vector_Unit_ptr all, active;
+		
+		/* units_other */
+		vector_Unit_ptr other_ANY_RIDER, other_ANY_BABY2;
+		
+		vector_Unit_ptr bad;
+		vector_ptr unknown;
+	} units;
+	vector_UnitChunk_ptr unitChunks;
+	vector_ArtImageChunk_ptr artImageChunks;
+	
+	struct {
+		vector_NemesisRecord_ptr all, other[28], bad;
+		bool unk4;
+	} nemesis;
+
+	struct {
+		vector_Item_ptr all;
+		
+		vector_Item_ptr IN_PLAY;
+		vector_Item_ptr ANY_ARTIFACT;
+		vector_item_weaponst_ptr WEAPON;
+		vector_Item_ptr ANY_WEAPON;
+		vector_Item_ptr ANY_SPIKE;
+		vector_item_armorst_ptr ANY_TRUE_ARMOR;
+		vector_item_helmst_ptr ANY_ARMOR_HELM;
+		vector_item_shoesst_ptr ANY_ARMOR_SHOES;
+		vector_item_shieldst_ptr SHIELD;
+		vector_item_glovesst_ptr ANY_ARMOR_GLOVES;
+		vector_item_pantsst_ptr ANY_ARMOR_PANTS;
+		vector_item_quiverst_ptr QUIVER;
+		vector_item_splintst_ptr SPLINT;
+		vector_item_orthopedic_castst_ptr ORTHOPEDIC_CAST;
+		vector_item_crutchst_ptr CRUTCH;
+		vector_item_backpackst_ptr BACKPACK;
+		vector_item_ammost_ptr AMMO;
+		vector_item_woodst_ptr WOOD;
+		vector_item_branchst_ptr BRANCH;
+		vector_item_boulderst_ptr BOULDER;
+		vector_item_rockst_ptr ROCK;
+		vector_Item_ptr ANY_REFUSE;
+		vector_Item_ptr ANY_GOOD_FOOD;
+		vector_Item_ptr ANY_AUTO_CLEAN;
+		vector_Item_ptr ANY_GENERIC24;
+		vector_Item_ptr ANY_BUTCHERABLE;
+		vector_Item_ptr ANY_FURNITURE;
+		vector_Item_ptr ANY_CAGE_OR_TRAP;
+		vector_Item_ptr ANY_EDIBLE_RAW;
+		vector_Item_ptr ANY_EDIBLE_CARNIVORE;
+		vector_Item_ptr ANY_EDIBLE_BONECARN;
+		vector_Item_ptr ANY_EDIBLE_VERMIN;
+		vector_Item_ptr ANY_EDIBLE_VERMIN_BOX;
+		vector_Item_ptr ANY_CAN_ROT;
+		vector_Item_ptr ANY_MURDERED;
+		vector_Item_ptr ANY_DEAD_DWARF;
+		vector_Item_ptr ANY_GENERIC36;
+		vector_Item_ptr ANY_GENERIC37;
+		vector_Item_ptr ANY_GENERIC38;
+		vector_Item_ptr ANY_GENERIC39;
+		vector_item_doorst_ptr DOOR;
+		vector_item_floodgatest_ptr FLOODGATE;
+		vector_item_hatch_coverst_ptr HATCH_COVER;
+		vector_item_gratest_ptr GRATE;
+		vector_item_cagest_ptr CAGE;
+		vector_item_flaskst_ptr FLASK;
+		vector_item_windowst_ptr WINDOW;
+		vector_item_gobletst_ptr GOBLET;
+		vector_item_instrumentst_ptr INSTRUMENT;
+		vector_item_instrumentst_ptr INSTRUMENT_STATIONARY;
+		vector_item_toyst_ptr TOY;
+		vector_item_toolst_ptr TOOL;
+		vector_item_bucketst_ptr BUCKET;
+		vector_item_barrelst_ptr BARREL;
+		vector_item_chainst_ptr CHAIN;
+		vector_item_animaltrapst_ptr ANIMALTRAP;
+		vector_item_bedst_ptr BED;
+		vector_item_traction_benchst_ptr TRACTION_BENCH;
+		vector_item_chairst_ptr CHAIR;
+		vector_item_coffinst_ptr COFFIN;
+		vector_item_tablest_ptr TABLE;
+		vector_item_statuest_ptr STATUE;
+		vector_item_slabst_ptr SLAB;
+		vector_item_quernst_ptr QUERN;
+		vector_item_millstonest_ptr MILLSTONE;
+		vector_item_boxst_ptr BOX;
+		vector_item_binst_ptr BIN;
+		vector_item_armorstandst_ptr ARMORSTAND;
+		vector_item_weaponrackst_ptr WEAPONRACK;
+		vector_item_cabinetst_ptr CABINET;
+		vector_item_anvilst_ptr ANVIL;
+		vector_item_catapultpartsst_ptr CATAPULTPARTS;
+		vector_item_ballistapartsst_ptr BALLISTAPARTS;
+		vector_item_siegeammost_ptr SIEGEAMMO;
+		vector_item_trappartsst_ptr TRAPPARTS;
+		vector_item_threadst_ptr ANY_WEBS;
+		vector_item_pipe_sectionst_ptr PIPE_SECTION;
+		vector_Item_ptr ANY_ENCASED;
+		vector_Item_ptr ANY_IN_CONSTRUCTION;
+		vector_item_drinkst_ptr DRINK;
+		vector_item_drinkst_ptr ANY_DRINK;
+		vector_item_liquid_miscst_ptr LIQUID_MISC;
+		vector_item_powder_miscst_ptr POWDER_MISC;
+		vector_Item_ptr ANY_COOKABLE;
+		vector_Item_ptr ANY_GENERIC84;
+		vector_item_verminst_ptr VERMIN;
+		vector_item_petst_ptr PET;
+		vector_Item_ptr ANY_CRITTER;
+		vector_item_coinst_ptr COIN;
+		vector_item_globst_ptr GLOB;
+		vector_item_trapcompst_ptr TRAPCOMP;
+		vector_item_barst_ptr BAR;
+		vector_item_smallgemst_ptr SMALLGEM;
+		vector_item_blocksst_ptr BLOCKS;
+		vector_item_roughst_ptr ROUGH;
+		vector_item_body_component_ptr ANY_CORPSE;
+		vector_item_corpsest_ptr CORPSE;
+		vector_item_bookst_ptr BOOK;
+		vector_item_figurinest_ptr FIGURINE;
+		vector_item_amuletst_ptr AMULET;
+		vector_item_scepterst_ptr SCEPTER;
+		vector_item_crownst_ptr CROWN;
+		vector_item_ringst_ptr RING;
+		vector_item_earringst_ptr EARRING;
+		vector_item_braceletst_ptr BRACELET;
+		vector_item_gemst_ptr GEM;
+		vector_item_corpsepiecest_ptr CORPSEPIECE;
+		vector_item_remainsst_ptr REMAINS;
+		vector_item_meatst_ptr MEAT;
+		vector_item_fishst_ptr FISH;
+		vector_item_fish_rawst_ptr FISH_RAW;
+		vector_item_eggst_ptr EGG;
+		vector_item_seedsst_ptr SEEDS;
+		vector_item_plantst_ptr PLANT;
+		vector_item_skin_tannedst_ptr SKIN_TANNED;
+		vector_item_plant_growthst_ptr PLANT_GROWTH;
+		vector_item_threadst_ptr THREAD;
+		vector_item_clothst_ptr CLOTH;
+		vector_item_sheetst_ptr SHEET;
+		vector_item_totemst_ptr TOTEM;
+		vector_item_pantsst_ptr PANTS;
+		vector_item_cheesest_ptr CHEESE;
+		vector_item_foodst_ptr FOOD;
+		vector_item_ballistaarrowheadst_ptr BALLISTAARROWHEAD;
+		vector_item_armorst_ptr ARMOR;
+		vector_item_shoesst_ptr SHOES;
+		vector_item_helmst_ptr HELM;
+		vector_item_glovesst_ptr GLOVES;
+		vector_Item_ptr ANY_GENERIC128;
+		vector_Item_ptr FOOD_STORAGE;
+		vector_Item_ptr ANY_RECENTLY_DROPPED;
+		vector_Item_ptr ANY_MELT_DESIGNATED;
+
+		vector_Item_ptr bad;
+		vector_int badTag;
+	} items;
+
+	struct {
+		vector_ArtifactRecord_ptr all, bad;
+	} artifacts;
+
+	JobHandler jobs;
+	ProjListLink projList;
+	BuildingHandler buildings;
+	MachineHandler machines;
+
+	struct {
+		vector_FlowGuide_ptr all, bad;
+	} flowGuides;
+
+	struct {
+		int32_t numJobs[10];
+		int32_t numHaulers[10];
+		struct {
+			int8_t unk_1, food, unk_2, unk_3;
+		} simple1;
+		vector_int8_t seeds, plants, cheese, meat_fish, eggs, leaves, plant_powder;
+		struct {
+			int8_t seeds, plants, cheese, fish, meat, leaves, powder, eggs;
+		} simple2;
+		vector_int8_t liquid_plant, liquid_animal, liquid_builtin;
+		struct {
+			int8_t globFat, globTallow, globPaste, globPressed, weapons, shield, ammo, coins, barBlocks, gems, finishedGoods, tannedSkins, threadCloth, unk1, unk2, unk3;
+		} simple3;
+	} stockpile;
+
+	struct {
+		vector_Plant_ptr all, shrubDry, shrubWet, treeDry, treeWet, empty;
+	} plants;
+
+	struct {
+		bool slotsUsed[500];
+		int32_t relMap[500][500];
+		int32_t nextSlot;
+	} enemyStatusCache;
+
+	struct {
+		vector_ScheduleInfo_ptr all, bad;
+	} schedules;
+
+	struct {
+		vector_Squad_ptr all, bad;
+	} squads;
+
+	struct {
+		vector_int_ptr all
+		vector_ptr bad;
+	} formations;
+
+	struct {
+		vector_ActivityEntry_ptr all, bad;
+	} activities;
+
+	struct {
+		vector_Report_ptr reports, annuncements;
+		vector_PopupMessage_ptr popups;
+		int32_t nextReportID;
+		union {
+			struct {
+				uint32_t combat : 1;
+				uint32_t hunting : 1;
+				uint32_t sparring : 1;
+			};
+			uint32_t flags;
+		};
+		int32_t unk_1[9];
+		vector_MissionReport_ptr missionReports;
+		vector_SpoilsReport_ptr spoilsReports;
+		vector_InterrogationReport_ptr interrogationReports;
+		int32_t displayTimer;
+
+		// ... TODO
+	} status;
+	
+	// ... TODO
 } World;
 ]]

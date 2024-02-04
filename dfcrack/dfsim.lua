@@ -26,7 +26,7 @@ function dfsim.update()
 --[[ TODO monitor a file for timestamp, something like 'exec-sim.lua'
 -- and upon timestamp update, read and execute its contents
 --]]
-
+	print('world', df.world)
 end
 
 -- make sure jit is on ... i think it is by default, right? looks like it.
