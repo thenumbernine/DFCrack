@@ -15,16 +15,21 @@ local df = require 'mem'
 local dfsim = {}
 
 function dfsim.update()
---[[ debugging
+--[[ debugging -- verify thread
 	print(('dfmain.update pthread_self: %x'):format(pthread.pthread_self()))
 --]]
---	print('version', df.version, df.version[0])	-- works
---	print('cursor', df.cursor[0].x, df.cursor[0].y, df.cursor[0].z)
+	-- works
+--	print('version', df.version, df.version[0])
+	-- works
+--	print('cursor', df.cursor[0])
 
 --[[ TODO monitor a file for timestamp, something like 'exec-sim.lua'
 -- and upon timestamp update, read and execute its contents
 --]]
 
 end
+
+-- make sure jit is on ... i think it is by default, right? looks like it.
+print(jit.status())
 
 return dfsim
