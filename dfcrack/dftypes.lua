@@ -85,9 +85,9 @@ makeDfArray('uint8_t', 'dfarray_byte')
 makeDfArray'short'
 
 -- except that its indexes and size are >>3
-ffi.cdef[[typedef dfarray_byte dfarray_bit;]] 
+ffi.cdef[[typedef dfarray_byte dfarray_bit;]]
 
--- TODO is this the std::list layout? 
+-- TODO is this the std::list layout?
 -- are the items always pointers?
 local function makeList(T, name)
 	name = name or 'list_'..T
@@ -110,7 +110,7 @@ typedef short3_t Coord;
 typedef short2_t Coord2D;
 ]]
 
--- used in a few places: 
+-- used in a few places:
 ffi.cdef[[
 typedef struct {
 	int3_t start, end;
@@ -808,13 +808,13 @@ enum {
 
 ffi.cdef[[
 typedef struct {
-	
+
 	int32_t item;
 	ItemType itemType;
 	int16_t itemSubType;
 	int16_t matType;
 	int32_t matIndex;
-	
+
 	int32_t shooterItem;
 	ItemType shooterItemType;
 	int16_t shooterItemSubType;
@@ -1092,7 +1092,7 @@ enum {
 
 ffi.cdef[[
 typedef int16_t EntityPositionResponsibility;
-enum { 
+enum {
 	EntityPositionResponsibility_NONE = -1, /* -1, 0xFFFFFFFFFFFFFFFF*/
 	EntityPositionResponsibility_LAW_MAKING, /* 0, 0x0*/
 	EntityPositionResponsibility_LAW_ENFORCEMENT, /* 1, 0x1*/
@@ -1340,7 +1340,7 @@ struct Unit {
 	uint32_t unk_4_3 : 1;
 
 	struct {
-		UnitMeetingState state;	/* UnitMeetingState_* */ 
+		UnitMeetingState state;	/* UnitMeetingState_* */
 		/* umm should this struct be packed? */
 		uint32_t targetEntity;
 		EntityPositionResponsibility targetRole;
@@ -1433,7 +1433,7 @@ typedef struct Unit Unit;
 ffi.cdef[[
 typedef struct {
 	void * vtable; /* TODO */
-	
+
 	Coord pos;
 
 	/* item_flags */
@@ -1476,7 +1476,7 @@ typedef struct {
 	uint32_t grown : 1;
 	uint32_t unkBook : 1; /*!< possibly book/written-content-related */
 	uint32_t anon_1 : 1;
-	
+
 	uint32_t age;
 	int32_t id;
 	vector_SpecificRef_ptr specificRefs;
@@ -1504,7 +1504,7 @@ typedef struct {
 
 ffi.cdef[[
 typedef int16_t VerminCategory;
-enum {		
+enum {
 	VerminCategory_None = -1, /* -1, 0xFFFFFFFFFFFFFFFF*/
 	VerminCategory_Eater, /* 0, 0x0*/
 	VerminCategory_Grounder, /* 1, 0x1*/
@@ -1526,14 +1526,14 @@ typedef struct {
 	bool visible;
 	int16_t countdown;
 	Item * item;
-	
+
 	/* vermin_flags */
 	uint32_t anon_1 : 1;
 	uint32_t is_colony : 1;
 	uint32_t anon_2 : 1;
 	uint32_t is_roaming_colony : 1;
 	uint32_t anon_3 : 1;
-	
+
 	int32_t amount;
 	WorldPopulationRef population;
 	VerminCategory category;	/* VerminCategory_* */
@@ -1688,7 +1688,7 @@ typedef struct {
 	int32_t y2;
 	int32_t centery;
 	int32_t z;
-	
+
 	union {
 		uint32_t flags;
 		struct {
@@ -1702,7 +1702,7 @@ typedef struct {
 			uint32_t fromWorldGen : 1;
 		};
 	};
-	
+
 	int16_t matType;
 	int32_t matIndex;
 	BuildingExtents room;
@@ -2005,7 +2005,7 @@ typedef union {
 
 -- block_square_event_spoorst.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct BlockSquareEventSpoorst BlockSquareEventSpoorst;'
 makeVectorPtr'BlockSquareEventSpoorst'
 
@@ -2016,19 +2016,19 @@ makeVectorPtr'HistoricalFigure'
 
 -- world_region_details.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldRegionDetails WorldRegionDetails;'
 makeVectorPtr'WorldRegionDetails'
 
 -- world_construction_square.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldConstructionSquare WorldConstructionSquare;'
 makeVectorPtr'WorldConstructionSquare'
 
 -- world_construction.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldConstruction WorldConstruction;'
 makeVectorPtr'WorldConstruction'
 
@@ -2052,114 +2052,114 @@ typedef struct {
 
 -- world_site.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldSite WorldSite;'
 makeVectorPtr'WorldSite'
 
 -- world_site_unk130.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldSiteUnknown130 WorldSiteUnknown130;'
 makeVectorPtr'WorldSiteUnknown130'
 
 -- resource_allotment_data.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct ResourceAllotmentData ResourceAllotmentData;'
 makeVectorPtr'ResourceAllotmentData'
 
 -- breed.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct Breed Breed;'
 makeVectorPtr'Breed'
 
 -- battlefield.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct Battlefield Battlefield;'
 makeVectorPtr'Battlefield'
 
 -- region_weather.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct RegionWeather RegionWeather;'
 makeVectorPtr'RegionWeather'
 
 -- world_object_data.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldObjectData WorldObjectData;'
 makeVectorPtr'WorldObjectData'
 
 -- world_landmass.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldLandMass WorldLandMass;'
 makeVectorPtr'WorldLandMass'
 
 -- world_region.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldRegion WorldRegion;'
 makeVectorPtr'WorldRegion'
 
 -- world_underground_region.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldUndergroundRegion WorldUndergroundRegion;'
 makeVectorPtr'WorldUndergroundRegion'
 
 -- world_geo_biome.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldGeoBiome WorldGeoBiome;'
 makeVectorPtr'WorldGeoBiome'
 
 -- world_mountain_peak.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldMountainPeak WorldMountainPeak;'
 makeVectorPtr'WorldMountainPeak'
 
 -- world_river.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldRiver WorldRiver;'
 makeVectorPtr'WorldRiver'
 
 -- region_map_entry.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct RegionMapEntry RegionMapEntry;'
 makeVectorPtr'RegionMapEntry'
 
 -- embark_note.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct EmbarkNote EmbarkNote;'
 makeVectorPtr'EmbarkNote'
 
 -- feature_init.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct FeatureInit FeatureInit;'
 makeVectorPtr'FeatureInit'
 
 -- world_geo_layer.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct WorldGeoLayer WorldGeoLayer;'
 
 -- entity_raw.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct EntityRaw EntityRaw;'
 makeVectorPtr'EntityRaw'
 
 -- abstract_building.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct AbstractBuilding AbstractBuilding;'
 makeVectorPtr'AbstractBuilding'
 
@@ -2174,49 +2174,49 @@ typedef struct {
 
 -- material_template.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct MaterialTemplate MaterialTemplate;'
 makeVectorPtr'MaterialTemplate'
 
 -- inorganic_raw.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct InorganicRaw InorganicRaw;'
 makeVectorPtr'InorganicRaw'
 
 -- plant_raw.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct PlantRaw PlantRaw;'
 makeVectorPtr'PlantRaw'
 
 -- tissue_template.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct TissueTemplate TissueTemplate;'
 makeVectorPtr'TissueTemplate'
 
 -- body_detail_plan.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct BodyDetailPlan BodyDetailPlan;'
 makeVectorPtr'BodyDetailPlan'
 
 -- body_template.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct BodyTemplate BodyTemplate;'
 makeVectorPtr'BodyTemplate'
 
 -- creature_variation.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct CreatureVariation CreatureVariation;'
 makeVectorPtr'CreatureVariation'
 
 -- creature_raw.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct CreatureRaw CreatureRaw;'
 makeVectorPtr'CreatureRaw'
 
@@ -2236,7 +2236,7 @@ typedef struct {
 
 -- itemdef.h
 
---- TODO 
+--- TODO
 ffi.cdef'typedef struct ItemDef ItemDef;'
 makeVectorPtr'ItemDef'
 makeVectorPtr'ItemDef_weaponst'
@@ -2379,16 +2379,16 @@ typedef struct {
 		vector_ItemDef_pantsst_ptr pants;
 		vector_ItemDef_foodst_ptr food;
 	} itemdefs;
-	
+
 	vector_EntityRaw_ptr entities;
-	
+
 	struct {
 		vector_LanguageWord_ptr words;
 		vector_LanguageSymbol_ptr symbols;
 		vector_LanguageTranslation_ptr translations;
 		LanguageWordTable wordTable[2][67];
 	} language;
-	
+
 	struct {
 		vector_DescriptorColor_ptr colors;
 		vector_DescriptorShape_ptr shapes;
@@ -2397,28 +2397,28 @@ typedef struct {
 		vector_int unk_2; /*!< since v0.47.01 */
 		vector_int unk_3; /*!< since v0.47.01 */
 	} descriptors;
-	
+
 	struct {
 		vector_Reaction_ptr reactions;
 		vector_ReactionCategory_ptr reactionCategories;
 	} reactions;
-	
+
 	struct {
 		vector_BuildingDef_ptr all;
 		vector_BuildingDefWorkshopst_ptr workshops;
 		vector_BuildingDefFurnacest_ptr furnaces;
 		int32_t next_id;
 	} buildings;
-	
+
 	vector_Interaction_ptr interactions; /*!< since v0.34.01 */
-	
+
 	struct {
 		vector_short organicTypes[39];
 		vector_int organicIndexes[39];
 		vector_int organicUnknown[39]; /*!< everything 0 */
 		Material * builtin[659];
 	} matTable;
-	
+
 	struct {
 		vector_short matTypes;
 		vector_int matIndexes;
@@ -3382,16 +3382,16 @@ typedef struct {
 	vector_DeepVeinHollow_ptr deepVeinHollows;
 	vector_CursedTomb_ptr cursedTombs;
 	vector_Engraving_ptr engravings;
-	
+
 	struct {
 		vector_Vermin_ptr all, colonies;
 	} vermin;
-	
+
 	vector_Coord_ptr dirtyWaters; /*!< for making blood flow downstream in rivers, but also includes mud in artificial water channels */
 	vector_Campfire_ptr campfires;
 	vector_WebCluster_ptr webClusters;
 	vector_Fire_ptr fires;
-	
+
 	vector_OceanWaveMaker_ptr oceanWaveMakers;
 	vector_OceanWave_ptr oceanWaves;
 	vector_Construction_ptr constructions;
@@ -3403,13 +3403,13 @@ typedef struct {
 		vector_DeepVeinHollow_ptr deepVeinHollows;
 		vector_CursedTomb_ptr cursedTombs;
 		vector_Engraving_ptr engravings;
-		
+
 		vector_Construction_ptr constructions;
 		vector_EmbarkFeature_ptr embarkFeatures;
 		vector_OceanWaveMaker_ptr oceanWaveMakers;
 		vector_CoordRect_ptr murkyPools;
 	} site;
-	
+
 	vector_EffectInfo_ptr effects;
 	vector_CoinBatch_ptr coinBatches;
 	vector_LocalPopulation_ptr populations;
@@ -3429,18 +3429,18 @@ typedef struct {
 	struct {
 		vector_Unit_ptr all;
 		vector_Unit_ptr active;
-		
+
 		struct {
 			vector_Unit_ptr ANY_RIDER;
 			vector_Unit_ptr ANY_BABY2;
 		} other;
-		
+
 		vector_Unit_ptr bad;
 		vector_ptr unknown;
 	} units;
 	vector_UnitChunk_ptr unitChunks;
 	vector_ArtImageChunk_ptr artImageChunks;
-	
+
 	struct {
 		vector_NemesisRecord_ptr all;
 		vector_NemesisRecord_ptr other[28];
@@ -3450,7 +3450,7 @@ typedef struct {
 
 	struct {
 		vector_Item_ptr all;
-		
+
 		vector_Item_ptr IN_PLAY;
 		vector_Item_ptr ANY_ARTIFACT;
 		vector_Item_weaponst_ptr WEAPON;
@@ -3594,10 +3594,10 @@ typedef struct {
 
 	JobHandler jobs;
 	list_Projectile projectileList;
-	
+
 	struct {
 		vector_Building_ptr all;
-	
+
 		struct {
 			vector_Building_ptr IN_PLAY;
 			vector_Building_ptr LOCATION_ASSIGNED;
@@ -3697,7 +3697,7 @@ typedef struct {
 		bool checkBridgeCollapse;
 		bool checkMachineCollapse;
 	} buildings;
-	
+
 	struct {
 		vector_Machine_ptr all;
 		vector_Machine_ptr bad;
@@ -3795,7 +3795,7 @@ typedef struct {
 				};
 			};
 		} slots[100];
-			
+
 		int16_t slotIDUsed[38];
 		int16_t slotIDIndex1[38];
 		int16_t slotIDIndex2[38];
@@ -3821,7 +3821,7 @@ typedef struct {
 	struct {
 		vector_Crime_ptr all, bad;
 	} crimes;
- 
+
  /*!< since v0.34.08: */
 	struct {
 		vector_Vehicle_ptr all, active, bad;
@@ -3927,12 +3927,12 @@ typedef struct {
 	} math;
 
 	struct {
-/* all versions: */		
+/* all versions: */
 		uint8_t rotation;
-/*!< since v0.34.05 */	
+/*!< since v0.34.05 */
 		ZLevelFlags * zLevelflags;
-/*!< since v0.40.01 */	
-		vector_BlockSquareEventSpoorst_ptr unk_v40_3a; 
+/*!< since v0.40.01 */
+		vector_BlockSquareEventSpoorst_ptr unk_v40_3a;
 		vector_short unk_v40_3b;
 		vector_short unk_v40_3c;
 		vector_short unk_v40_3d;
@@ -4062,7 +4062,7 @@ typedef struct {
 		vector_int unk5[336]; /*!< since v0.40.01 */
 		vector_int unk6[336]; /*!< since v0.40.01 */
 	} unk_v40_6; /*!< every value matches a nemesis, but unk2/3 have too few values to draw conclusions. Note that nemesis matches may just be a conincidence of falling within the nemesis range */
-	
+
 	vector_WorldUnknown131ec0_ptr unk_131ec0; /*!< since v0.42.01 */
 
 	vector_WorldLanguages_ptr languages;
@@ -4168,7 +4168,7 @@ typedef struct {
 		vector_int creature_cnt;
 		int32_t unk_int1;
 	} arenaSpawn;
-	
+
 	struct {
 		ConflictLevel conflictLevel;
 		bool morale_enable;
@@ -4183,10 +4183,10 @@ typedef struct {
 		std_string tree_filter;
 		std_string tree_age_str;
 	} arenaSettings;
-	
+
 	int8_t unk_26b5b8;
 	int8_t unk_26b5b9;
-	
+
 	struct {
 		vector_ptr unk_1;
 		vector_ptr unk_2;
@@ -4206,7 +4206,7 @@ typedef struct {
 		vector_ptr unk_10;
 		vector_ptr unk_11;
 	} unk_26c678; /*!< since v0.47.01 */
-	
+
 	struct {
 		vector_World_Unknown19325c_Unknown1_ptr unk_1;
 		vector_World_Unknown19325c_Unknown2_ptr unk_2;
@@ -4226,4 +4226,3 @@ typedef struct {
 ffi.cdef[[
 typedef Rect3D SelectionRect;
 ]]
-
