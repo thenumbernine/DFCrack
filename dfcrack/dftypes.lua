@@ -30,7 +30,10 @@ local function makeStdVector(T, name)
 	-- TODO rewrite my ffi.cpp.vector file to be a C struct this
 	local code = template([[
 typedef struct {
-	<?=T?> * start;
+	union {
+		<?=T?> * v;		/* shorthand index access: .v[] */
+		<?=T?> * start;
+	};
 	<?=T?> * finish;
 	<?=T?> * endOfStorage;
 } <?=name?>;
@@ -42,6 +45,30 @@ typedef struct {
 	ffi.cdef(code)
 	assert(ffi.sizeof(name) == 24)
 	assert(ffi.sizeof(T..'*') == 8)
+
+	local mt = {}
+	mt.__index = mt
+	function mt:size()
+		return self.finish - self.start
+	end
+	function mt:capacity()
+		return self.endOfStorage - self.start
+	end
+
+	-- slow impl
+	function mt:__ipairs()
+		return coroutine.wrap(function()
+			-- TODO validate size every iteration?
+			-- or just claim that modifying invalidates iteration...
+			for i=0,self:size()-1 do
+				coroutine.yield(i, self.v[i])
+			end
+		end)
+	end
+
+
+
+	ffi.metatype(name, mt)
 end
 
 makeStdVector('void*', 'vector_ptr')
@@ -4216,7 +4243,6 @@ typedef struct {
 		int32_t unk_6;
 	} unk_19325c;
 	int32_t unk_26b618; /*!< since v0.40.01 */
-
 } World;
 ]]
 

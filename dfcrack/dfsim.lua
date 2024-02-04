@@ -14,6 +14,8 @@ local df = require 'mem'
 
 local dfsim = {}
 
+local haveRunFastDwarf
+
 function dfsim.update()
 --[[ debugging -- verify thread
 	print(('dfmain.update pthread_self: %x'):format(pthread.pthread_self()))
@@ -26,7 +28,22 @@ function dfsim.update()
 --[[ TODO monitor a file for timestamp, something like 'exec-sim.lua'
 -- and upon timestamp update, read and execute its contents
 --]]
-	print('world', df.world)
+	
+	-- wait for the world to be loaded...
+	if df.world ~= nil 
+	and df.world.map.blockIndex ~= nil
+	then
+		-- world is loaded
+		if not haveRunFastDwarf then
+			haveRunFastDwarf = true
+			for i,u in ipairs(df.world.units.active) do
+				print('unit', i, u)
+			end
+		end
+	else
+		-- not loaded? clear state flags
+		haveRunFastDwarf = false
+	end
 end
 
 -- make sure jit is on ... i think it is by default, right? looks like it.
