@@ -12,12 +12,12 @@ typedef vec3i_t int3_t;
 ]]
 
 ffi.cdef[[
-typedef struct {
+typedef struct std_string_pointer {
 	char * data;
 	size_t len;
 	/* maybe more, meh */
 } std_string_pointer;
-typedef struct {
+typedef struct std_string {
 	std_string_pointer * _M_p;
 } std_string;
 ]]
@@ -29,7 +29,7 @@ local function makeStdVector(T, name)
 	-- template type of our vector ... 8 bytes mind you
 	-- TODO rewrite my ffi.cpp.vector file to be a C struct this
 	local code = template([[
-typedef struct {
+typedef struct <?=name?> {
 	union {
 		<?=T?> * v;		/* shorthand index access: .v[] */
 		<?=T?> * start;
@@ -41,8 +41,12 @@ typedef struct {
 		T = T,			-- vector type / template arg
 		name = name,	-- vector name
 	})
-	--print(require 'template.showcode'(code))
-	ffi.cdef(code)
+	assert(xpcall(function()
+		ffi.cdef(code)
+	end, function(err)
+		print(require 'template.showcode'(code))
+		return err..'\n'..debug.traceback()
+	end))
 	assert(ffi.sizeof(name) == 24)
 	assert(ffi.sizeof(T..'*') == 8)
 
@@ -66,19 +70,24 @@ typedef struct {
 		end)
 	end
 
-
-
-	ffi.metatype(name, mt)
+	assert(xpcall(function()
+		ffi.metatype(name, mt)
+	end, function(err)
+		print(require 'template.showcode'(code))
+		return 'for metatype '..name..'\n'
+			..err..'\n'
+			..debug.traceback()
+	end))
 end
 
 makeStdVector('void*', 'vector_ptr')
 makeStdVector('char*', 'vector_char_ptr')
-makeStdVector('uint8_t', 'vector_byte')	-- ubyte?
-makeStdVector('int8_t', 'vector_sbyte')
-makeStdVector'short'
-makeStdVector('unsigned short', 'vector_ushort')
-makeStdVector'int'
-makeStdVector('unsigned int', 'vector_uint')
+makeStdVector('int8_t', 'vector_int8')
+makeStdVector('uint8_t', 'vector_uint8')
+makeStdVector('short', 'vector_int16')
+makeStdVector('unsigned short', 'vector_uint16')
+makeStdVector('int', 'vector_int32')
+makeStdVector('unsigned int', 'vector_uint32')
 makeStdVector('std_string', 'vector_string')
 
 -- TODO WTF WHO USES BOOL VECTOR?!?!?!??!
@@ -88,11 +97,16 @@ makeStdVector('bool', 'vector_bool')
 
 -- 'T' is the ptr base type
 local function makeVectorPtr(T, name)
+	-- TODO '_ptr' suffix vs 'p' prefix?
 	name = name or 'vector_'..T..'_ptr'
-	-- for now just use void*, later I'll add types
+	--[[ just use void*, later I'll add types
 	local code = 'typedef vector_ptr vector_'..T..'_ptr;'
 	--print(code)
 	ffi.cdef(code)
+	--]]
+	-- [[ or really cast the type correctly
+	return makeStdVector(T..' *', name)
+	--]]
 end
 
 makeVectorPtr'int'
@@ -102,7 +116,7 @@ makeVectorPtr'int'
 local function makeDfArray(T, name)
 	name = name or 'dfarray_'..T
 	ffi.cdef(template([[
-typedef struct {
+typedef struct <?=name?> {
 	<?=T?> * data;
 	uint16_t size;
 } <?=name?>;
@@ -147,7 +161,7 @@ typedef short2_t Coord2D;
 
 -- used in a few places:
 ffi.cdef[[
-typedef struct {
+typedef struct Rect3D {
 	int3_t start, end;
 } Rect3D;
 ]]
@@ -155,7 +169,7 @@ typedef struct {
 -- coord_rect.h aka
 
 ffi.cdef[[
-typedef struct {
+typedef struct Rect2pt5D {
 	Coord2D v1, v2;
 	int16_t z;
 } Rect2pt5D;
@@ -166,9 +180,9 @@ makeVectorPtr'CoordRect'
 -- coord2d_path.h
 
 ffi.cdef[[
-typedef struct {
-	vector_short x;
-	vector_short y;
+typedef struct Coord2DPath {
+	vector_int16 x;
+	vector_int16 y;
 } Coord2DPath;
 ]]
 
@@ -177,10 +191,10 @@ typedef struct {
 -- more like a vector-of-coords in SOA format
 -- used for generic vector-of-coords, not necessarily as a path
 ffi.cdef[[
-typedef struct {
-	vector_short x;
-	vector_short y;
-	vector_short z;
+typedef struct CoordPath {
+	vector_int16 x;
+	vector_int16 y;
+	vector_int16 z;
 } CoordPath;
 ]]
 
@@ -189,7 +203,7 @@ typedef struct {
 
 -- why not uint32_t[8] ?
 ffi.cdef[[
-typedef struct {
+typedef struct TileBitmask {
 	uint16_t bits[16];
 } TileBitmask;
 ]]
@@ -215,7 +229,7 @@ struct BlockBurrow {
 -- general_ref.h
 
 ffi.cdef[[
-typedef struct {
+typedef struct GeneralRef {
 	void * vtable;	/* todo */
 } GeneralRef;
 ]]
@@ -274,7 +288,7 @@ typedef struct Job Job;
 typedef struct HistoricalFigure HistoricalFigure;
 typedef struct HistoricalEntity HistoricalEntity;
 typedef struct UnitItemWrestle UnitItemWrestle;
-typedef struct {
+typedef struct SpecificRef {
 	SpecificRefType type;	/* SpecificRefType_* */
 	union {
 		Unit * unit;
@@ -285,7 +299,7 @@ typedef struct {
 		Job * job;
 		HistoricalFigure * histfig;
 		HistoricalEntity * entity;
-		struct {
+		struct Wrestle {
 			void * wrestleUnknown1;
 			UnitItemWrestle * wrestleItem;
 		} wrestle;
@@ -315,7 +329,7 @@ enum {
 -- world_population_ref.h
 
 ffi.cdef[[
-typedef struct {
+typedef struct WorldPopulationRef {
 	int16_t region_x;
 	int16_t region_y;
 	int16_t feature_idx;
@@ -471,7 +485,7 @@ enum {
 	JobSkill_RIDING, /* 136, 0x88*/
 };
 ]]
-ffi.cdef'typedef vector_short vector_JobSkill;'
+ffi.cdef'typedef vector_int16 vector_JobSkill;'
 
 -- profession.h
 
@@ -702,7 +716,7 @@ enum {
 -- language_name.h
 
 ffi.cdef[[
-typedef struct {
+typedef struct LanguageName {
 	std_string first_name;
 	std_string nickname;
 	int32_t words[7];
@@ -734,9 +748,9 @@ makeVectorPtr'LanguageTranslation'
 -- language_word_table.h
 
 ffi.cdef[[
-typedef struct {
-	vector_int words[6];
-	vector_int parts[6]; /* PartOfSpeech_* */
+typedef struct LanguageWordTable {
+	vector_int32 words[6];
+	vector_int32 parts[6]; /* PartOfSpeech_* */
 } LanguageWordTable;
 ]]
 
@@ -839,12 +853,12 @@ enum {
 	ItemType_BRANCH, /* 90, 0x5A*/
 };
 ]]
-ffi.cdef'typedef vector_short vector_ItemType;'
+ffi.cdef'typedef vector_int16 vector_ItemType;'
 
 -- history_hit_item.h
 
 ffi.cdef[[
-typedef struct {
+typedef struct HistoryHitItem {
 
 	int32_t item;
 	ItemType itemType;
@@ -1227,7 +1241,7 @@ enum {
 -- unit_genes.h
 
 ffi.cdef[[
-typedef struct {
+typedef struct UnitGenes {
 	dfarray_byte appearance;
 	dfarray_short colors;
 } UnitGenes;
@@ -1236,9 +1250,9 @@ typedef struct {
 -- cie_add_tag_mask1.h
 
 ffi.cdef[[
-typedef union {
+typedef union CIEAddTagMask1 {
 	uint32_t flags;
-	struct {
+	struct CIEAddTagMask1_Bits {
 		uint32_t EXTRAVISION : 1;
 		uint32_t OPPOSED_TO_LIFE : 1;
 		uint32_t NOT_LIVING : 1;
@@ -1280,7 +1294,7 @@ typedef union {
 ffi.cdef[[
 typedef union {
 	uint32_t flags;
-	struct {
+	struct CIEAddTagMask2_Bits {
 		uint32_t NO_AGING : 1;
 		uint32_t MORTAL : 1;
 		uint32_t STERILE : 1;
@@ -1294,8 +1308,8 @@ typedef union {
 
 ffi.cdef[[
 typedef struct {
-	vector_short matType;
-	vector_int matIndex;
+	vector_int16 matType;
+	vector_int32 matIndex;
 } MaterialVecRef;
 ]]
 
@@ -1350,13 +1364,13 @@ makeStdVector'BodyLayerStatus'
 ffi.cdef[[
 typedef struct {
 	vector_BodyPartStatus bodyPartStatus;
-	vector_uint numberedMasks; /*!< 1 bit per instance of a numbered body part */
-	vector_uint nonSolidRemaining; /*!< 0-100% */
+	vector_uint32 numberedMasks; /*!< 1 bit per instance of a numbered body part */
+	vector_uint32 nonSolidRemaining; /*!< 0-100% */
 	vector_BodyLayerStatus layerStatus;
-	vector_uint layerWoundArea;
-	vector_uint layerCutFraction; /*!< 0-10000 */
-	vector_uint layerDentFraction; /*!< 0-10000 */
-	vector_uint layerEffectFraction; /*!< 0-1000000000 */
+	vector_uint32 layerWoundArea;
+	vector_uint32 layerCutFraction; /*!< 0-10000 */
+	vector_uint32 layerDentFraction; /*!< 0-10000 */
+	vector_uint32 layerEffectFraction; /*!< 0-1000000000 */
 } BodyComponentInfo;
 ]]
 
@@ -1615,15 +1629,18 @@ makeVectorPtr'ArmyController'
 ffi.cdef'typedef struct Occupation Occupation;'
 makeVectorPtr'Occupation'
 
-
-
--- unit.h
+-- unit_inventory_item.h
 
 -- TODO
-ffi.cdef[[
-typedef struct UnitGhostInfo UnitGhostInfo;
-]]
+ffi.cdef'typedef struct UnitInventoryItem UnitInventoryItem;'
 makeVectorPtr'UnitInventoryItem'
+
+-- unit_ghost_info.h
+
+-- TODO
+ffi.cdef'typedef struct UnitGhostInfo UnitGhostInfo;'
+
+-- unit.h
 
 ffi.cdef[[
 typedef int16_t SoldierMood;
@@ -1854,21 +1871,21 @@ struct Unit {
 		int32_t patrolCoolDown;
 		int32_t patrolTimer;
 		int16_t curUniform;
-		vector_int unk_items; /*!< since v0.34.06 */
-		vector_int uniforms[4];
+		vector_int32 unk_items; /*!< since v0.34.06 */
+		vector_int32 uniforms[4];
 		union {
 			uint32_t whole;	/* not needed? */
 			uint32_t update : 1;
 		} pickupFlags;	/* aslo not needed?  just pickupUpdate intead? */
-		vector_int uniformPickup;
-		vector_int uniformDrop;
-		vector_int individualDrills;
+		vector_int32 uniformPickup;
+		vector_int32 uniformDrop;
+		vector_int32 individualDrills;
 	} military;
 
-	vector_int socialActivities;
-	vector_int conversations; /*!< since v0.40.01 */
-	vector_int activities;
-	vector_int unk_1e8; /*!< since v0.40.01 */
+	vector_int32 socialActivities;
+	vector_int32 conversations; /*!< since v0.40.01 */
+	vector_int32 activities;
+	vector_int32 unk_1e8; /*!< since v0.40.01 */
 	struct {
 		WorldPopulationRef population;
 		int32_t leaveCountdown; /*!< once 0, it heads for the edge and leaves */
@@ -1905,10 +1922,10 @@ struct Unit {
 	HistoryHitItem lastHit;
 	int32_t ridingItemID; /*!< since v0.34.08 */
 	vector_UnitInventoryItem_ptr inventory;
-	vector_int ownedItems;
-	vector_int tradedItems; /*!< items brought to trade depot */
+	vector_int32 ownedItems;
+	vector_int32 tradedItems; /*!< items brought to trade depot */
 	vector_Building_ptr ownedBuildings;
-	vector_int corpseParts; /*!< entries remain even when items are destroyed */
+	vector_int32 corpseParts; /*!< entries remain even when items are destroyed */
 
 	struct {
 		int32_t account;
@@ -1936,7 +1953,7 @@ struct Unit {
 		int32_t woundNextID;
 		int32_t unk_39c[10];
 		CasteBodyInfo * bodyPlan;
-		int16_t weaponBP;
+		int16_t weaponBodyPart;
 		UnitAttribute physicalAttrs[6];
 		BodySizeInfo sizeInfo;
 		uint32_t bloodMax;
@@ -1946,22 +1963,22 @@ struct Unit {
 	} body;
 	
 	struct {
-		vector_int body_modifiers;
-		vector_int bp_modifiers;
+		vector_int32 body_modifiers;
+		vector_int32 bp_modifiers;
 		int32_t size_modifier; /*!< product of all H/B/LENGTH body modifiers, in % */
-		vector_short tissue_style;
-		vector_int tissue_style_civ_id;
-		vector_int tissue_style_id;
-		vector_int tissue_style_type;
-		vector_int tissue_length; /*!< description uses bp_modifiers[style_list_idx[index] ] */
+		vector_int16 tissue_style;
+		vector_int32 tissue_style_civ_id;
+		vector_int32 tissue_style_id;
+		vector_int32 tissue_style_type;
+		vector_int32 tissue_length; /*!< description uses bp_modifiers[style_list_idx[index] ] */
 		UnitGenes genes;
-		vector_int colors;
+		vector_int32 colors;
 	} appearance;
 	
 	vector_UnitAction_ptr actions;
 	int32_t nextActionID;
 	
-	struct {
+	struct Unit_Counters {
 		int32_t thinkCounter;
 		int32_t jobCounter;
 		int32_t swapCounter; /*!< dec per job_counter reroll, can_swap if 0 */
@@ -1981,12 +1998,12 @@ struct Unit {
 		uint32_t dizziness;
 	} counters;
 	
-	struct {
+	struct Unit_Curse {
 		int32_t unk_0; /*!< moved from end of counters in 0.43.05 */
 		CIEAddTagMask1 addTags1;
-		CIEAddTagMask1 remTags1;
+		CIEAddTagMask1 removeTags1;
 		CIEAddTagMask2 addTags2;
-		CIEAddTagMask2 remTags2;
+		CIEAddTagMask2 removeTags2;
 		bool nameVisible; /*!< since v0.34.01 */
 		std_string name; /*!< since v0.34.01 */
 		std_string namePlural; /*!< since v0.34.01 */
@@ -1995,19 +2012,19 @@ struct Unit {
 		uint32_t symAndColor2; /*!< since v0.34.01 */
 		uint32_t flashPeriod; /*!< since v0.34.01 */
 		uint32_t flashTime2; /*!< since v0.34.01 */
-		vector_int body_appearance;
-		vector_int bp_appearance; /*!< since v0.34.01; guess! */
+		vector_int32 bodyAppearance;
+		vector_int32 bodyPartAppearance; /*!< since v0.34.01; guess! */
 		uint32_t speed_add; /*!< since v0.34.01 */
 		uint32_t speed_mul_percent; /*!< since v0.34.01 */
 		CurseAttrChange * attr_change; /*!< since v0.34.01 */
 		uint32_t luck_mul_percent; /*!< since v0.34.01 */
 		int32_t unk_98; /*!< since v0.42.01 */
-		vector_int interaction_id; /*!< since v0.34.01 */
-		vector_int interaction_time; /*!< since v0.34.01 */
-		vector_int interaction_delay; /*!< since v0.34.01 */
+		vector_int32 interaction_id; /*!< since v0.34.01 */
+		vector_int32 interaction_time; /*!< since v0.34.01 */
+		vector_int32 interaction_delay; /*!< since v0.34.01 */
 		int32_t time_on_site; /*!< since v0.34.01 */
-		vector_int own_interaction; /*!< since v0.34.01 */
-		vector_int own_interaction_delay; /*!< since v0.34.01 */
+		vector_int32 own_interaction; /*!< since v0.34.01 */
+		vector_int32 own_interaction_delay; /*!< since v0.34.01 */
 	} curse;
 	
 	struct T_counters2 {
@@ -2029,23 +2046,23 @@ struct Unit {
 		struct {
 			struct {
 				vector_ItemType item_type;
-				vector_short item_subtype;
+				vector_int16 item_subtype;
 				MaterialVecRef material;
-				vector_int year;
-				vector_int yearTime;
+				vector_int32 year;
+				vector_int32 yearTime;
 			} food;
 			struct {
 				vector_ItemType item_type;
-				vector_short itemSubType;
+				vector_int16 itemSubType;
 				MaterialVecRef material;
-				vector_int year;
-				vector_int yearTime;
+				vector_int32 year;
+				vector_int32 yearTime;
 			} drink;
 		} * eat_history;
 		int32_t demandTimeout;
 		int32_t mandateTimeout;
-		vector_int attackerIDs;
-		vector_short attackerCountdown;
+		vector_int32 attackerIDs;
+		vector_int16 attackerCountdown;
 		uint8_t faceDirection; /*!< for wagons */
 		LanguageName artifact_name;
 		vector_UnitSoul_ptr souls;
@@ -2053,7 +2070,7 @@ struct Unit {
 		vector_UnitDemand_ptr demands;
 		bool labors[94];
 		vector_UnitItemWrestle_ptr wrestle_items;
-		vector_int observedTraps;
+		vector_int32 observedTraps;
 		vector_UnitComplaint_ptr complaints;
 		vector_UnitUnknown138_ptr unk_138; /*!< since v0.44.01 */
 		vector_UnitRequest_ptr requests;
@@ -2085,18 +2102,18 @@ struct Unit {
 	} status2;
 	
 	struct {
-		vector_int unk_7c4;
-		vector_int unk_c; /*!< since v0.34.01 */
+		vector_int32 unk_7c4;
+		vector_int32 unk_c; /*!< since v0.34.01 */
 	} unknown7;
 	
 	struct {
 		vector_UnitSyndrome_ptr active;
-		vector_int reinfectionType;
-		vector_short reinfectionCount;
+		vector_int32 reinfectionType;
+		vector_int16 reinfectionCount;
 	} syndromes;
 	
 	struct {
-		vector_int log[3];
+		vector_int32 log[3];
 		int32_t last_year[3];
 		int32_t last_year_tick[3];
 	} reports;
@@ -2105,7 +2122,7 @@ struct Unit {
 	vector_UnitItemUse_ptr usedItems; /*!< Contains worn clothes, armor, weapons, arrows fired by archers */
 	
 	struct {
-		vector_int sound_cooldown; /*!< since v0.34.01 */
+		vector_int32 sound_cooldown; /*!< since v0.34.01 */
 		struct {
 			int32_t unk_1;
 			int32_t unk_2;
@@ -2179,17 +2196,17 @@ struct Unit {
 		struct {
 			ArmyController * controller; /*!< since v0.40.01 */
 			struct {
-				vector_int unk_1;
-				vector_int unk_2;
-				vector_int unk_3;
-				vector_int unk_4;
+				vector_int32 unk_1;
+				vector_int32 unk_2;
+				vector_int32 unk_3;
+				vector_int32 unk_4;
 			} * unk_2; /*!< since v0.40.01 */
-			vector_int unk_3; /*!< since v0.40.01 */
-			vector_int unk_4; /*!< since v0.40.01 */
-			vector_int unk_5; /*!< since v0.40.01 */
+			vector_int32 unk_3; /*!< since v0.40.01 */
+			vector_int32 unk_4; /*!< since v0.40.01 */
+			vector_int32 unk_5; /*!< since v0.40.01 */
 			struct {
-				vector_int unk_0;
-				vector_int unk_10;
+				vector_int32 unk_0;
+				vector_int32 unk_10;
 			} * unk_6;
 			struct {
 				vector_UnitEnemyUnknownv40Sub3_Unknown7_UnknownSub1_ptr unk_sub1;
@@ -2212,24 +2229,24 @@ struct Unit {
 		dfarray_bit/*CasteRawFlags*/ casteFlags; /*!< since v0.44.06 */
 		int32_t enemyStatusSlot;
 		int32_t unk_874_cntr;
-		vector_byte body_part_878;
-		vector_byte body_part_888;
-		vector_int body_part_relsize; /*!< with modifiers */
-		vector_byte body_part_8a8;
-		vector_ushort body_part_base_ins;
-		vector_ushort body_part_clothing_ins;
-		vector_ushort body_part_8d8;
-		vector_int unk_8e8;
-		vector_ushort unk_8f8;
+		vector_uint8 body_part_878;
+		vector_uint8 body_part_888;
+		vector_int32 body_part_relsize; /*!< with modifiers */
+		vector_uint8 body_part_8a8;
+		vector_uint16 body_part_base_ins;
+		vector_uint16 body_part_clothing_ins;
+		vector_uint16 body_part_8d8;
+		vector_int32 unk_8e8;
+		vector_uint16 unk_8f8;
 	} enemy;
 	
-	vector_int healing_rate;
+	vector_int32 healing_rate;
 	int32_t effective_rate;
 	int32_t tendons_heal;
 	int32_t ligaments_heal;
 	int32_t weight;
 	int32_t weight_fraction; /*!< 1e-6 */
-	vector_int burrows;
+	vector_int32 burrows;
 	UnitVisionCone* vision_cone;
 	vector_Occupation_ptr occupations; /*!< since v0.42.01 */
 	std_string adjective; /*!< from physical descriptions for use in adv */
@@ -2250,10 +2267,10 @@ do
 
 	function mt:isOpposedToLife()
 		assert(self ~= nil, "self is nil")
-		if self.curse.rem_tags1.OPPOSED_TO_LIFE then
+		if self.curse.removeTags1.OPPOSED_TO_LIFE then
 			return false
 		end
-		if self.curse.add_tags1.bits.OPPOSED_TO_LIFE then
+		if self.curse.addTags1.bits.OPPOSED_TO_LIFE then
 			return true
 		end
 		return casteFlagSet(
@@ -2443,7 +2460,7 @@ ffi.cdef[[
 typedef struct {
 	bool triggered;
 	int32_t unk_1;
-	vector_int buildings;
+	vector_int32 buildings;
 	Coord pos;
 } GlowingBarrier;
 ]]
@@ -2466,9 +2483,9 @@ makeVectorPtr'Rect3D'
 ffi.cdef[[
 typedef struct {
 	int8_t triggered;	/* vs bool?*/
-	vector_int coffinSkeletons;
+	vector_int32 coffinSkeletons;
 	int32_t disturbance;
-	vector_int treasures;
+	vector_int32 treasures;
 	int32_t unk_1;
 	int32_t unk_2;
 	vector_Rect3D_ptr triggerRegions;
@@ -2626,7 +2643,6 @@ typedef struct {
 	int32_t unk_v40_3; /*!< since v0.40.01 */
 } Building;
 ]]
-makeVectorPtr'Building'
 
 -- projectile.h
 
@@ -2810,11 +2826,6 @@ makeVectorPtr'Scale'
 ffi.cdef'typedef struct Rhythm Rhythm;'
 makeVectorPtr'Rhythm'
 
--- occupation.h
-
-ffi.cdef'typedef struct Occupation Occupation;'
-makeVectorPtr'Occupation'
-
 -- belief_system.h
 
 ffi.cdef'typedef struct BeliefSystem BeliefSystem;'
@@ -2934,7 +2945,7 @@ makeVectorPtr'EntityClaimMaskMapRegionMask'
 ffi.cdef[[
 typedef struct {
 	struct {
-		vector_int entities;
+		vector_int32 entities;
 		vector_EntityClaimMaskMapRegionMask_ptr regionMasks;
 	} ** map;
 	int16_t width;
@@ -3120,8 +3131,8 @@ typedef struct {
 	vector_CreatureRaw_ptr alphabetic;
 	vector_CreatureRaw_ptr all;
 	int32_t numCaste; /*!< seems equal to length of vectors below */
-	vector_int listCreature; /*!< Together with list_caste, a list of all caste indexes in order. */
-	vector_int listCaste;
+	vector_int32 listCreature; /*!< Together with list_caste, a list of all caste indexes in order. */
+	vector_int32 listCaste;
 	vector_string actionStrings; /*!< since v0.40.01 */
 } CreatureHandler;
 ]]
@@ -3129,23 +3140,26 @@ typedef struct {
 -- itemdef.h
 
 --- TODO
-ffi.cdef'typedef struct ItemDef ItemDef;'
-makeVectorPtr'ItemDef'
-makeVectorPtr'ItemDef_weaponst'
-makeVectorPtr'ItemDef_trapcompst'
-makeVectorPtr'ItemDef_toyst'
-makeVectorPtr'ItemDef_toolst'
-makeVectorPtr'ItemDef_toolst'
-makeVectorPtr'ItemDef_instrumentst'
-makeVectorPtr'ItemDef_armorst'
-makeVectorPtr'ItemDef_ammost'
-makeVectorPtr'ItemDef_siegeammost'
-makeVectorPtr'ItemDef_glovesst'
-makeVectorPtr'ItemDef_shoesst'
-makeVectorPtr'ItemDef_shieldst'
-makeVectorPtr'ItemDef_helmst'
-makeVectorPtr'ItemDef_pantsst'
-makeVectorPtr'ItemDef_foodst'
+for T in ([[
+ItemDef
+ItemDef_weaponst
+ItemDef_trapcompst
+ItemDef_toyst
+ItemDef_toolst
+ItemDef_instrumentst
+ItemDef_armorst
+ItemDef_ammost
+ItemDef_siegeammost
+ItemDef_glovesst
+ItemDef_shoesst
+ItemDef_shieldst
+ItemDef_helmst
+ItemDef_pantsst
+ItemDef_foodst
+]]):gmatch'[%w_]+' do
+	ffi.cdef('typedef struct '..T..' '..T..';')
+	makeVectorPtr(T)
+end
 
 -- material.h
 
@@ -3241,11 +3255,11 @@ typedef struct {
 	struct {
 		vector_PlantRaw_ptr all;
 		vector_PlantRaw_ptr bushes;
-		vector_int bushesIndex;
+		vector_int32 bushesIndex;
 		vector_PlantRaw_ptr trees;
-		vector_int treesIndex;
+		vector_int32 treesIndex;
 		vector_PlantRaw_ptr grasses;
-		vector_int grassesIndex;
+		vector_int32 grassesIndex;
 	} plants;
 	vector_TissueTemplate_ptr tissueTemplates;
 	vector_BodyDetailPlan_ptr bodyDetailPlans;
@@ -3285,9 +3299,9 @@ typedef struct {
 		vector_DescriptorColor_ptr colors;
 		vector_DescriptorShape_ptr shapes;
 		vector_DescriptorPattern_ptr patterns;
-		vector_int unk_1; /*!< since v0.47.01 */
-		vector_int unk_2; /*!< since v0.47.01 */
-		vector_int unk_3; /*!< since v0.47.01 */
+		vector_int32 unk_1; /*!< since v0.47.01 */
+		vector_int32 unk_2; /*!< since v0.47.01 */
+		vector_int32 unk_3; /*!< since v0.47.01 */
 	} descriptors;
 
 	struct {
@@ -3305,26 +3319,26 @@ typedef struct {
 	vector_Interaction_ptr interactions; /*!< since v0.34.01 */
 
 	struct {
-		vector_short organicTypes[39];
-		vector_int organicIndexes[39];
-		vector_int organicUnknown[39]; /*!< everything 0 */
+		vector_int16 organicTypes[39];
+		vector_int32 organicIndexes[39];
+		vector_int32 organicUnknown[39]; /*!< everything 0 */
 		Material * builtin[659];
 	} matTable;
 
 	struct {
 		// first two fields match MaterialVecRef
-		vector_short matTypes;
-		vector_int matIndexes;
-		vector_int interactions;
+		vector_int16 matTypes;
+		vector_int32 matIndexes;
+		vector_int32 interactions;
 		vector_Syndrome_ptr all; /*!< since v0.34.01 */
 	} syndromes;
 	
 	struct {
 		// first two fields match MaterialVecRef
 		// first three fields matches syndromes
-		vector_short matTypes;
-		vector_int matIndexes;
-		vector_int interactions;
+		vector_int16 matTypes;
+		vector_int32 matIndexes;
+		vector_int32 interactions;
 		vector_CreatureInteractionEffect_ptr all; /*!< since v0.34.01 */
 	} effects;
 
@@ -3350,11 +3364,11 @@ enum {
 ]]
 
 ffi.cdef[[
-struct {
+typedef struct {
 	int32_t unk_0;
 	int32_t race;
 	int32_t unk_8;
-} WorldDataUnknown274Unknown10 ;
+} WorldDataUnknown274Unknown10;
 ]]
 makeVectorPtr'WorldDataUnknown274Unknown10'
 
@@ -3472,9 +3486,9 @@ typedef struct {
 		int16_t* unk_8;
 		int32_t* unk_c;
 	} ** featureMap;
-	vector_int old_sites;
-	vector_int old_site_x;
-	vector_int old_site_y;
+	vector_int32 old_sites;
+	vector_int32 old_site_x;
+	vector_int32 old_site_y;
 	Coord2DPath land_rgns;
 	int32_t unk_260;
 	int8_t unk_264;
@@ -3691,8 +3705,8 @@ typedef struct {
 		vector_HistoryEventCollection_ptr other[18];
 	} event_collections;
 	vector_HistoryEra_ptr eras;
-	vector_int discoveredArtImageID;
-	vector_short discoveredArtImageSubID;
+	vector_int32 discoveredArtImageID;
+	vector_int16 discoveredArtImageSubID;
 	int32_t totalUnknown;
 	int32_t totalPowers; /*!< also includes megabeasts */
 	int32_t totalMegaBeasts;
@@ -3855,6 +3869,27 @@ typedef struct {
 } WorldGenParams;
 ]]
 
+-- engraving.h
+
+ffi.cdef'typedef struct Engraving Engraving;'
+makeVectorPtr'Engraving'
+
+-- campfire.h
+
+ffi.cdef'typedef struct Campfire Campfire;'
+makeVectorPtr'Campfire'
+
+-- web_cluster.h
+
+ffi.cdef'typedef struct WebCluster WebCluster;'
+makeVectorPtr'WebCluster'
+
+-- fire.h
+
+ffi.cdef'typedef struct Fire Fire;'
+makeVectorPtr'Fire'
+
+
 -- world.h
 
 -- TODO codegen + methods with proper types
@@ -3863,12 +3898,8 @@ for T in ([[
 GlowingBarrier
 DeepVeinHollow
 CursedTomb
-Engraving
 Vermin
 Coord
-Campfire
-WebCluster
-Fire
 OceanWaveMaker
 OceanWave
 Construction
@@ -3910,7 +3941,6 @@ Item_flaskst
 Item_windowst
 Item_gobletst
 Item_instrumentst
-Item_instrumentst
 Item_toyst
 Item_toolst
 Item_bucketst
@@ -3938,7 +3968,6 @@ Item_siegeammost
 Item_trappartsst
 Item_threadst
 Item_pipe_sectionst
-Item_drinkst
 Item_drinkst
 Item_liquid_miscst
 Item_powder_miscst
@@ -3980,7 +4009,6 @@ Item_foodst
 Item_ballistaarrowheadst
 ArtifactRecord
 Building_stockpilest
-Building_civzonest
 Building_civzonest
 Building_actual
 Building_boxst
@@ -4025,45 +4053,12 @@ Building_coffinst
 Building_weaponrackst
 Building_armorstandst
 Building_furnacest
-Building_furnacest
-Building_furnacest
-Building_furnacest
-Building_furnacest
-Building_furnacest
-Building_furnacest
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
-Building_workshopst
 Building_workshopst
 Building_weaponst
 Building_instrumentst
 Building_offering_placest
-
-
 ]]):gmatch'[%w_]+' do
+	ffi.cdef('typedef struct '..T..' '..T..';')
 	makeVectorPtr(T)
 end
 
@@ -4088,7 +4083,7 @@ enum {
 ffi.cdef[[
 typedef struct {
 	WorldPopulationRef ref;
-	vector_int grasses;
+	vector_int32 grasses;
 } WorldLayerGrasses;
 ]]
 makeVectorPtr'WorldLayerGrasses'
@@ -4471,7 +4466,7 @@ typedef struct {
 		vector_Item_ptr ANY_MELT_DESIGNATED;
 
 		vector_Item_ptr bad;
-		vector_int badTag;
+		vector_int32 badTag;
 	} items;
 
 	struct {
@@ -4599,11 +4594,11 @@ typedef struct {
 		struct {
 			int8_t unk_1, food, unk_2, unk_3;
 		} simple1;
-		vector_sbyte seeds, plants, cheese, meat_fish, eggs, leaves, plant_powder;
+		vector_int8 seeds, plants, cheese, meat_fish, eggs, leaves, plant_powder;
 		struct {
 			int8_t seeds, plants, cheese, fish, meat, leaves, powder, eggs;
 		} simple2;
-		vector_sbyte liquid_plant, liquid_animal, liquid_builtin;
+		vector_int8 liquid_plant, liquid_animal, liquid_builtin;
 		struct {
 			int8_t globFat, globTallow, globPaste, globPressed, weapons, shield, ammo, coins, barBlocks, gems, finishedGoods, tannedSkins, threadCloth, unk1, unk2, unk3;
 		} simple3;
@@ -4819,9 +4814,9 @@ typedef struct {
 		ZLevelFlags * zLevelflags;
 /*!< since v0.40.01 */
 		vector_BlockSquareEventSpoorst_ptr unk_v40_3a;
-		vector_short unk_v40_3b;
-		vector_short unk_v40_3c;
-		vector_short unk_v40_3d;
+		vector_int16 unk_v40_3b;
+		vector_int16 unk_v40_3c;
+		vector_int16 unk_v40_3d;
 	} mapExtras;
 
 	WorldData * worldData;
@@ -4879,28 +4874,28 @@ typedef struct {
 		int8_t unk_19;
 		int8_t unk_20;
 		vector_EntityRaw_ptr entityRaws;
-		vector_short unk_21;
+		vector_int16 unk_21;
 		int32_t civCount;
 		int32_t civsLeftToPlace;
 		vector_WorldRegion_ptr regions1[10];
 		vector_WorldRegion_ptr regions2[10];
 		vector_WorldRegion_ptr regions3[10];
-		vector_int unk_22;
-		vector_int unk_23;
-		vector_int unk_24;
-		vector_int unk_25;
-		vector_int unk_26;
-		vector_int unk_27;
+		vector_int32 unk_22;
+		vector_int32 unk_23;
+		vector_int32 unk_24;
+		vector_int32 unk_25;
+		vector_int32 unk_26;
+		vector_int32 unk_27;
 		int32_t unk_28;
 		int32_t unk_29;
-		vector_short unk_10d298; /*!< since v0.40.01 */
-		vector_short unk_10d2a4; /*!< since v0.40.01 */
+		vector_int16 unk_10d298; /*!< since v0.40.01 */
+		vector_int16 unk_10d2a4; /*!< since v0.40.01 */
 		vector_AbstractBuilding_ptr libraries; /*!< since v0.42.01 */
 		int32_t unk_30; /*!< since v0.42.01 */
 		vector_AbstractBuilding_ptr temples; /*!< since v0.44.01 */
 		vector_ArtifactRecord_ptr some_artifacts; /*!< since v0.44.01 */
 		vector_ptr unk_31; /*!< since v0.47.01 */
-		vector_int unk_32; /*!< since v0.47.01 */
+		vector_int32 unk_32; /*!< since v0.47.01 */
 	} worldgenStatus;
 
     FlowReusePool orphanedFlowPool;
@@ -4918,13 +4913,13 @@ typedef struct {
 		int16_t rndX[16];
 		int16_t rndY[16];
 		int32_t blockIndex;
-		vector_short unk7a;
-		vector_short unk7b;
-		vector_short unk7c;
-		vector_short unk7_cntdn;
+		vector_int16 unk7a;
+		vector_int16 unk7b;
+		vector_int16 unk7c;
+		vector_int16 unk7_cntdn;
 	} flowEngine;
 
-	vector_int busyBuildings;
+	vector_int32 busyBuildings;
 	dfarray_bit caveInFlags;
 
 	SaveVersion originalSaveVersion;
@@ -4941,12 +4936,12 @@ typedef struct {
 	vector_EntityPopulation_ptr entityPopulations;
 
 	struct {
-		vector_int unk1[336]; /*!< since v0.40.01 */
-		vector_int unk2[336]; /*!< since v0.40.01 */
-		vector_int unk3[336]; /*!< since v0.40.01 */
-		vector_int unk4[336]; /*!< since v0.40.01 */
-		vector_int unk5[336]; /*!< since v0.40.01 */
-		vector_int unk6[336]; /*!< since v0.40.01 */
+		vector_int32 unk1[336]; /*!< since v0.40.01 */
+		vector_int32 unk2[336]; /*!< since v0.40.01 */
+		vector_int32 unk3[336]; /*!< since v0.40.01 */
+		vector_int32 unk4[336]; /*!< since v0.40.01 */
+		vector_int32 unk5[336]; /*!< since v0.40.01 */
+		vector_int32 unk6[336]; /*!< since v0.40.01 */
 	} unk_v40_6; /*!< every value matches a nemesis, but unk2/3 have too few values to draw conclusions. Note that nemesis matches may just be a conincidence of falling within the nemesis range */
 
 	vector_WorldUnknown131ec0_ptr unk_131ec0; /*!< since v0.42.01 */
@@ -5003,24 +4998,24 @@ typedef struct {
 	struct {
 		vector_WorldSite_ptr unk_v47_1; /*!< since v0.47.01 */
 		vector_FeatureInit_ptr mapFeatures;
-		vector_short featureX;
-		vector_short featureY;
-		vector_short featureLocalIndex; /*!< same as map_block.local_feature */
-		vector_int featureGlobalIndex;
+		vector_int16 featureX;
+		vector_int16 featureY;
+		vector_int16 featureLocalIndex; /*!< same as map_block.local_feature */
+		vector_int32 featureGlobalIndex;
 		vector_FeatureInit_ptr unk_1; /*!< from unk_9C */
-		vector_short unk_2; /*!< unk_9C.region.x */
-		vector_short unk_3; /*!< unk_9C.region.y */
-		vector_short unk_4; /*!< unk_9C.embark.x */
-		vector_short unk_5; /*!< unk_9C.embark.y */
-		vector_short unk_6; /*!< unk_9C.local_feature_idx */
-		vector_int unk_7; /*!< unk_9C.global_feature_idx */
-		vector_int unk_8; /*!< unk_9C.unk10 */
-		vector_short unk_9; /*!< unk_9C.unk14 */
-		vector_short unk_10; /*!< unk_9C.local.x */
-		vector_short unk_11; /*!< unk_9C.local.y */
-		vector_short unk_12; /*!< unk_9C.z_min */
-		vector_short unk_13; /*!< unk_9C.z_min; yes, seemingly duplicate */
-		vector_short unk_14; /*!< unk_9C.z_max */
+		vector_int16 unk_2; /*!< unk_9C.region.x */
+		vector_int16 unk_3; /*!< unk_9C.region.y */
+		vector_int16 unk_4; /*!< unk_9C.embark.x */
+		vector_int16 unk_5; /*!< unk_9C.embark.y */
+		vector_int16 unk_6; /*!< unk_9C.local_feature_idx */
+		vector_int32 unk_7; /*!< unk_9C.global_feature_idx */
+		vector_int32 unk_8; /*!< unk_9C.unk10 */
+		vector_int16 unk_9; /*!< unk_9C.unk14 */
+		vector_int16 unk_10; /*!< unk_9C.local.x */
+		vector_int16 unk_11; /*!< unk_9C.local.y */
+		vector_int16 unk_12; /*!< unk_9C.z_min */
+		vector_int16 unk_13; /*!< unk_9C.z_min; yes, seemingly duplicate */
+		vector_int16 unk_14; /*!< unk_9C.z_max */
 		vector_bool unk_15; /*!< since v0.40.11 */
 	} features;
 	bool allowAnnouncements; /*!< announcements will not be processed at all if false */
@@ -5028,8 +5023,8 @@ typedef struct {
 	bool unknown_26a9aa; /*!< since v0.42.01 */
 
 	struct {
-		vector_short race;
-		vector_short caste;
+		vector_int16 race;
+		vector_int16 caste;
 		int32_t type;
 		std_string filter; /*!< since v0.34.08 */
 		vector_WorldItemTypes_ptr itemTypes[107]; /*!< true array */
@@ -5038,17 +5033,17 @@ typedef struct {
 		vector_ptr unk_vec3;
 		struct {
 			vector_JobSkill skills;
-			vector_int skill_levels;
+			vector_int32 skill_levels;
 			vector_ItemType itemTypes;
-			vector_short itemSubTypes;
+			vector_int16 itemSubTypes;
 			MaterialVecRef itemMaterials;
-			vector_int itemCounts;
+			vector_int32 itemCounts;
 		} equipment;
 		int32_t side;
 		int32_t interaction;
 		int32_t tame; /*!< since v0.47.01; sets tame-mountable status when the creature creation menu is opened */
 		vector_InteractionEffect_ptr interactions; /*!< since v0.34.01 */
-		vector_int creature_cnt;
+		vector_int32 creature_cnt;
 		int32_t unk_int1;
 	} arenaSpawn;
 
@@ -5076,9 +5071,9 @@ typedef struct {
 		int32_t unk_3;
 		struct /*world_unk26c678_unk38*/ {
 			vector_ptr unk_1[107];
-			vector_int unk_2;
-			vector_short unk_3;
-			vector_short unk_4;
+			vector_int32 unk_2;
+			vector_int16 unk_3;
+			vector_int16 unk_4;
 		} unk_38;
 		vector_ptr unk_4;
 		vector_ptr unk_5;
