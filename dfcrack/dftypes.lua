@@ -3678,11 +3678,11 @@ typedef struct {
 	int32_t temperature_frequency[6];
 	int32_t volcanism_frequency[6];
 	WorldGenParamsPS * ps;
-	int32_t reveal_all_history;
-	int32_t cull_historical_figures;
-	int32_t erosion_cycle_count;
-	int32_t periodically_erode_extremes;
-	int32_t orographic_precipitation;
+	int32_t revealAllHistory;
+	int32_t cullHistoricalFigures;
+	int32_t erosionCycleCount;
+	int32_t periodicallyErodeExtremes;
+	int32_t orographicPrecipitation;
 	int32_t playable_civilization_required;
 	int32_t all_caves_visible;
 	int32_t show_embark_tunnel;
