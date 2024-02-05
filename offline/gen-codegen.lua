@@ -111,6 +111,7 @@ local primitiveTypeNames = {
 	['signed int'] = true,
 	float = true,
 	double = true,
+	['stl-string'] = 'std_string',
 }
 -- reserved = do require, don't transform
 local reservedTypeNames = table(primitiveTypeNames, {
@@ -189,9 +190,16 @@ local class = require 'ext.class'
 
 local Type = class()
 function Type:init(name) self.name = assert(name) end
-function Type:makeLuaName() return makeTypeName(self.name) end
+function Type:makeLuaName() 
+	local res = reservedTypeNames[self.name] 
+	if res == true then res = self.name end
+	if res then return res end 
+	return makeTypeName(self.name)
+end
 function Type:getBase() return self end
-function Type:isReserved() return reservedTypeNames[self.name] end
+function Type:isReserved() 
+	return reservedTypeNames[self.name] 
+end
 
 local PtrType = Type:subclass()
 function PtrType:init(base) 
@@ -261,10 +269,10 @@ local function makeEnumType(ch)
 	return out:concat'\n'
 end
 
-local function makeStructNode(ch, structName)
+local function makeStructNode(ch, structName, typesUsed)
 	local out = table()
 
-	assert(xpcall(function()
+	local result, structType = xpcall(function()
 
 		local parentType = htmlcommon.findattr(ch, 'inherits-from')
 		if not ch.child then
@@ -353,7 +361,9 @@ local function makeStructNode(ch, structName)
 										-- TODO make compound as a struct
 										--fieldType = makeTypeName(baseFieldName)
 										
-										fieldTypeStr = makeStructNode(fieldnode) -- no trailing ;, no name, anonymous struct
+										fieldTypeStr, structType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName), typesUsed) -- no trailing ;, no name, anonymous struct
+										out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
+										return structType
 									end
 									return Type(fieldTypeStr)
 								elseif fieldtag == 'bitfield' then
@@ -405,7 +415,9 @@ local function makeStructNode(ch, structName)
 												out:insert'-- ERROR pointer to a structure?'
 												-- here we don't have a ptrBaseType ...
 												-- in fact this is usually the point at which the perl code generates another nested structure
-												out:insert(makeStructNode(fieldnode))
+												local structStr
+												structStr, ptrBaseType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName), typesUsed)
+												out:insert(structStr)
 											else
 												assert(#fieldnode.child == 1)
 												local subFieldName
@@ -452,6 +464,8 @@ local function makeStructNode(ch, structName)
 									end
 
 									return Type(fieldTypeStr)
+								elseif fieldtag == 'stl-string' then
+									return Type'stl-string'	-- gets translated in :getLuaName()
 								else
 									return Type(fieldtag)	-- prim
 								end
@@ -496,9 +510,17 @@ local function makeStructNode(ch, structName)
 		return 'for struct '..tostring(structName)..'\n'
 			..err..'\n'
 			..debug.traceback()
-	end))
+	end)
+	if not result then error(structType) end
 
-	return out:concat'\n'
+	local structType
+	if structName then
+		structType = Type(structName)
+	else
+		-- I think even nested structs will need name in LuaJIT
+		error("what to call this struct")
+	end
+	return out:concat'\n', structType
 end
 
 
@@ -547,7 +569,8 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 				out:insert"local ffi = require 'ffi'"
 				out:insert'ffi.cdef[['
-				out:insert(makeStructNode(ch, structName))
+				local structStr = makeStructNode(ch, structName, typesUsed)
+				out:insert(structStr)
 				out:insert']]'
 
 				out = table.keys(typesUsed):sort():mapi(function(t)
