@@ -170,10 +170,13 @@ local function preprocess(tree)
 		local ch = tree[i]
 		-- TODO also handle string children here?
 		if type(ch) == 'string' then
+			-- remove text nodes.  they're not used. of course.
 			table.remove(tree, i)
 		elseif type(ch) == 'table' then
-			if ch.type == 'tag'
-			and ch.tag == 'comment'
+			-- remove <comment> nodes ... because xml ... smh
+			if (ch.type == 'tag' and ch.tag == 'comment')
+			-- remove real xml comments
+			or ch.type == 'comment'
 			then
 				table.remove(tree, i)
 			elseif ch.child then
@@ -348,21 +351,24 @@ local function makeStructNode(ch, structName, typesUsed)
 											error("got a static-array with both a type-name and a child node...")
 										end
 										return ArrayType(Type(fieldTypeStr), arrayCount)
-									else
-										-- TODO sometimes it's the first child, soemtimes it's ... type-name ? sometimes ... ?
-										if not fieldnode.child 
-										or not fieldnode.child[1]
-										then 
-											error"failed to find children of static-array"
-										end
-										local subFieldName, fieldType = getTypeFromNode(fieldnode.child[1])
-										-- TODO I guess that could be the typename if the nested node is a child node, smh...........
-										if subFieldName then
-											out:insert('-- ERROR: nested static-array has a name: '..subFieldName)
-										end
-
-										return ArrayType(fieldType, arrayCount)
 									end
+									-- TODO sometimes it's the first child, soemtimes it's ... type-name ? sometimes ... ?
+									local ptrTypeStr = htmlcommon.findattr(fieldnode, 'pointer-type')
+									if ptrTypeStr then
+										return ArrayType(PtrType(Type(ptrTypeStr)), arrayCount)
+									end
+									if not fieldnode.child 
+									or not fieldnode.child[1]
+									then 
+										error"failed to find children of static-array"
+									end
+									local subFieldName, fieldType = getTypeFromNode(fieldnode.child[1])
+									-- TODO I guess that could be the typename if the nested node is a child node, smh...........
+									if subFieldName then
+										out:insert('-- ERROR: nested static-array has a name: '..subFieldName)
+									end
+
+									return ArrayType(fieldType, arrayCount)
 									
 								elseif fieldtag == 'compound' then
 									local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
@@ -373,7 +379,7 @@ local function makeStructNode(ch, structName, typesUsed)
 										-- TODO make compound as a struct
 										--fieldType = makeTypeName(baseFieldName)
 										
-										fieldTypeStr, structType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName), typesUsed) -- no trailing ;, no name, anonymous struct
+										fieldTypeStr, structType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName or ''), typesUsed) -- no trailing ;, no name, anonymous struct
 										out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
 										return structType
 									end
@@ -636,7 +642,11 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 			elseif ch.tag == 'global-object' then
 
-error("you are here")
+error([[
+you are here.
+don't forget to straighten out what types get required.
+and then move the inline'd typedefs above to the global scope.
+]])
 				
 				-- TODO duplicate for struct and class below?
 				local name = htmlcommon.findattr(ch, 'name')
