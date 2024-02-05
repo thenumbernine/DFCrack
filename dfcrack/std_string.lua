@@ -1,4 +1,8 @@
 local ffi = require 'ffi'
+
+-- TODO move to ffi.cpp.string?
+-- and maybe move that to its own lib, like std-ffi.string ?
+
 ffi.cdef[[
 typedef struct std_string_pointer {
 	char * data;

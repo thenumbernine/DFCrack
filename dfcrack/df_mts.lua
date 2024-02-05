@@ -1,4 +1,9 @@
+--[[
+put your custom metatable code here
+--]]
 local ffi = require 'ffi'
+
+
 -- set up Unit metatable
 do
 	local mt = {}

@@ -11,19 +11,11 @@ typedef vec3s_t short3_t;
 typedef vec3i_t int3_t;
 ]]
 
-ffi.cdef[[
-typedef struct std_string_pointer {
-	char * data;
-	size_t len;
-	/* maybe more, meh */
-} std_string_pointer;
-typedef struct std_string {
-	std_string_pointer * _M_p;
-} std_string;
-]]
-assert(ffi.sizeof'std_string' == 8)
-
+require 'std_string'
 local makeStdVector = require 'std_vector'
+local makeList = require 'list'
+local makeDfArray = require 'dfarray'
+
 makeStdVector('void*', 'vector_ptr')
 makeStdVector('char*', 'vector_char_ptr')
 makeStdVector('int8_t', 'vector_int8')
@@ -43,52 +35,16 @@ makeStdVector('bool', 'vector_bool')
 local function makeVectorPtr(T, name)
 	-- TODO '_ptr' suffix vs 'p' prefix?
 	name = name or 'vector_'..T..'_ptr'
-	--[[ just use void*, later I'll add types
-	local code = 'typedef vector_ptr vector_'..T..'_ptr;'
-	--print(code)
-	ffi.cdef(code)
-	--]]
-	-- [[ or really cast the type correctly
 	return makeStdVector(T..' *', name)
-	--]]
 end
 
 makeVectorPtr'int'
 
--- dfarray.h
-
-local function makeDfArray(T, name)
-	name = name or 'dfarray_'..T
-	ffi.cdef(template([[
-typedef struct <?=name?> {
-	<?=T?> * data;
-	uint16_t size;
-} <?=name?>;
-]], {
-		T = T,
-		name = name,
-	}))
-end
 makeDfArray('uint8_t', 'dfarray_byte')
 makeDfArray'short'
 
 -- except that its indexes and size are >>3
 ffi.cdef[[typedef dfarray_byte dfarray_bit;]]
-
--- TODO is this the std::list layout?
--- are the items always pointers?
-local function makeList(T, name)
-	name = name or 'list_'..T
-	ffi.cdef(template([[
-typedef struct <?=name?> {
-	<?=T?> * item;
-	struct <?=name?> * prev, * next;
-} <?=name?>;
-]], {
-		T = T,
-		name = name,
-	}))
-end
 
 -- fwd decls:
 

@@ -1,10 +1,13 @@
 local ffi = require 'ffi'
 local template = require 'template'
+
+-- TODO incorporate with ffi.cpp.vector?
+-- and maybe move that to its own lib, like std-ffi.vector ?
+
 local function makeStdVector(T, name)
 	name = name or 'vector_'..T
 	-- stl vector in my gcc / linux / df is 24 bytes
 	-- template type of our vector ... 8 bytes mind you
-	-- TODO rewrite my ffi.cpp.vector file to be a C struct this
 	local code = template([[
 typedef struct <?=name?> {
 	union {
@@ -28,7 +31,10 @@ typedef struct <?=name?> {
 	assert(ffi.sizeof(T..'*') == 8)
 
 	local mt = {}
+	
+	-- TODO index for numbers to lookup in .v[]
 	mt.__index = mt
+	
 	function mt:size()
 		return self.finish - self.start
 	end
@@ -36,8 +42,8 @@ typedef struct <?=name?> {
 		return self.endOfStorage - self.start
 	end
 
-	-- slow impl
 	function mt:__ipairs()
+		-- slow impl
 		return coroutine.wrap(function()
 			-- TODO validate size every iteration?
 			-- or just claim that modifying invalidates iteration...
