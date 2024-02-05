@@ -204,7 +204,7 @@ function Type:declare(var)
 	if var then
 		var = snakeToCamelCase(var)
 	end
-	return self:makeLuaName()..' '..var
+	return self:makeLuaName()..' '..(var or '')
 end
 
 local PtrType = Type:subclass()
@@ -229,6 +229,12 @@ end
 function ArrayType:getBase() return self.base:getBase() end
 function ArrayType:makeLuaName()
 	return self.base:makeLuaName()..'['..self.count..']'
+end
+function ArrayType:declare(var)
+	if var then
+		var = snakeToCamelCase(var)
+	end
+	return self.base:declare(var)..'['..self.count..']'
 end
 
 local VecType = Type:subclass()
