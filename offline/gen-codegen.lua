@@ -200,6 +200,12 @@ function Type:getBase() return self end
 function Type:isReserved() 
 	return reservedTypeNames[self.name] 
 end
+function Type:declare(var)
+	if var then
+		var = snakeToCamelCase(var)
+	end
+	return self:makeLuaName()..' '..var
+end
 
 local PtrType = Type:subclass()
 function PtrType:init(base) 
@@ -310,7 +316,7 @@ local function makeStructNode(ch, structName, typesUsed)
 							baseFieldName = baseFieldName or fieldName
 
 							-- try to get the type
-							local result, fieldType, arrayCount = assert(xpcall(function()
+							local result, fieldType = assert(xpcall(function()
 						
 								-- sometimes the type is in the tag name, some times it is in the type-name attribute ...
 								if fieldtag == 'static-array' then
@@ -478,10 +484,10 @@ local function makeStructNode(ch, structName, typesUsed)
 							end))
 							if not result then error(fieldType) end
 							assert(Type:isa(fieldType))
-							return fieldName, fieldType, arrayCount
+							return fieldName, fieldType 
 						end
 
-						local fieldName, fieldType, arrayCount = getTypeFromNode(fieldnode)
+						local fieldName, fieldType = getTypeFromNode(fieldnode)
 						
 						assert(Type:isa(fieldType))
 						assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
@@ -489,14 +495,7 @@ local function makeStructNode(ch, structName, typesUsed)
 						-- if no type is specified then we just assume it's a struct or something
 						--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
 						
-						if fieldName then
-							fieldName = snakeToCamelCase(fieldName)
-						end
-						out:insert('\t'..fieldType:makeLuaName()..' '
-							..(fieldName or '')
-							..(arrayCount or '')
-							..';'
-						)
+						out:insert('\t'..fieldType:declare(fieldName or '')..';')
 						
 						-- TODO find which file has which type
 						typesUsed[makeTypeName(fieldType:getBase().name)] = true
