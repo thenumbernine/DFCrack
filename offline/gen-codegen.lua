@@ -224,7 +224,7 @@ local class = require 'ext.class'
 
 local Type = class()
 function Type:init(name) self.name = assert(name) end
-function Type:makeXFormed() return makeTypeName(self.name) end
+function Type:makeLuaName() return makeTypeName(self.name) end
 function Type:getBase() return self end
 function Type:isReserved() return reservedTypeNames[self.name] end
 
@@ -234,7 +234,24 @@ function PtrType:init(base)
 	self.base = assert(base) 
 end
 function PtrType:getBase() return self.base:getBase() end
-function PtrType:makeXFormed() return self.base:makeXFormed()..' *' end
+function PtrType:makeLuaName()
+	-- TODO if this is a pointer-to-an-array then you als need to wrap parenthesis
+	-- base (*field)[count]
+	-- and if you do that ... you also need the field name
+	return self.base:makeLuaName()..' *'
+end
+
+local ArrayType = Type:subclass()
+function ArrayType:init(base, count)
+	assert(Type:isa(base))
+	self.base = assert(base)
+	self.count = assert(count)
+end
+function ArrayType:getBase() return self.base:getBase() end
+function ArrayType:makeLuaName()
+	return self.base:makeLuaName()..'['..self.count..']'
+end
+
 
 local VecType = Type:subclass()
 function VecType:init(T) 
@@ -242,7 +259,7 @@ function VecType:init(T)
 	self.T = assert(T) 
 end
 function VecType:getBase() return self.T:getBase() end
-function VecType:makeXFormed() return 'vector_'..self.T:makeXFormed():gsub(' %*', '_ptr') end
+function VecType:makeLuaName() return 'vector_'..self.T:makeLuaName():gsub(' %*', '_ptr') end
 
 local destdir = path'dfcrack/df'
 destdir:mkdir()
@@ -355,7 +372,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 														if fieldnode.chid then
 															error("got a static-array with both a type-name and a child node...")
 														end
-														return Type(fieldTypeStr), '['..arrayCount..']'
+														return ArrayType(Type(fieldTypeStr), arrayCount)
 													else
 														-- TODO sometimes it's the first child, soemtimes it's ... type-name ? sometimes ... ?
 														if not fieldnode.child 
@@ -363,13 +380,13 @@ for f in (dfhacksrcdir/'xml'):dir() do
 														then 
 															error"failed to find children of static-array"
 														end
-														local subFieldName, fieldType, subCount = getTypeFromNode(fieldnode.child[1])
+														local subFieldName, fieldType = getTypeFromNode(fieldnode.child[1])
 														-- TODO I guess that could be the typename if the nested node is a child node, smh...........
 														if subFieldName then
 															out:insert('-- ERROR: nested static-array has a name: '..subFieldName)
 														end
 
-														return fieldType, (subCount or '')..'['..arrayCount..']'
+														return ArrayType(fieldType, arrayCount)
 													end
 													
 												elseif fieldtag == 'compound' then
@@ -433,14 +450,13 @@ for f in (dfhacksrcdir/'xml'):dir() do
 																out:insert'-- ERROR pointer to a structure?'
 															else
 																assert(#fieldnode.child == 1)
-																local subFieldName, subCount 
-																subFieldName, ptrBaseType, subCount = getTypeFromNode(fieldnode.child[1])
+																local subFieldName
+																subFieldName, ptrBaseType = getTypeFromNode(fieldnode.child[1])
 																assert(Type:isa(ptrBaseType))
 																if subFieldName then
 																	-- TODO it could be a nested type name
 																	out:insert("-- ERROR: nested pointer has a name: "..subFieldName)
 																end
-																--assert(not subCount, "TODO pointers to static-arrays")
 															end
 														end
 													end
@@ -504,7 +520,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 										if fieldName then
 											fieldName = snakeToCamelCase(fieldName)
 										end
-										out:insert('\t'..fieldType:makeXFormed()..' '
+										out:insert('\t'..fieldType:makeLuaName()..' '
 											..(fieldName or '')
 											..(arrayCount or '')
 											..';'
