@@ -363,7 +363,9 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
 				return structType
 			end
-			return Type(fieldTypeStr)
+			local resultType = Type(fieldTypeStr)
+			resultType.isAnonStruct = true
+			return resultType
 		elseif fieldtag == 'bitfield' then
 			-- TODO sometimes this has a type-name attr , and then i guess it points to another def somewhere else .... smh just write it in C++ not XML
 			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
@@ -527,8 +529,8 @@ function makeStructNode(structNode, structName, typesUsed)
 						assert(Type:isa(fieldType))
 						assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
 						-- and not unlike the globals,
-						-- if no type is specified then we just assume it's a struct or something
-						--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
+						-- if no type is specified then we just assume it's an anonymous struct/union
+						assert(fieldName or fieldType.isAnonStruct, "failed to find field name, or we aren't using an anonymous struct, for type "..tostring(fieldType))
 						
 						out:insert('\t'..fieldType:declare(fieldName or '')..';')
 						
