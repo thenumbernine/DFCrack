@@ -200,14 +200,17 @@ function Type:makeLuaName()
 	return makeTypeName(self.name)
 end
 function Type:getBase() return self end
-function Type:isReserved() 
-	return reservedTypeNames[self.name] 
-end
 function Type:declare(var)
 	if var then
 		var = snakeToCamelCase(var)
 	end
 	return self:makeLuaName()..' '..(var or '')
+end
+function Type:addTypeUsed(typesUsed)
+	local baseType = makeTypeName(self:getBase().name)
+	if not reservedTypeNames[baseType] then
+		typesUsed[baseType] = true
+	end
 end
 
 local PtrType = Type:subclass()
@@ -248,6 +251,12 @@ end
 function VecType:getBase() return self.T:getBase() end
 function VecType:makeLuaName() return 'vector_'..self.T:makeLuaName():gsub(' %*', '_ptr') end
 
+
+local AnonStructType = Type:subclass()
+function AnonStructType:init() end
+function AnonStructType:getBase() return self end
+function AnonStructType:makeLuaName() return '' end	-- assume the caller does stuff right
+function AnonStructType:addTypeUsed(typesUsed) end
 
 local function makeEnumType(ch)
 	local out = table()
@@ -334,7 +343,9 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 				error"failed to find children of static-array"
 			end
 			local code, subFieldName, fieldType = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
-			out:insert(code)
+			if string.trim(code) ~= '' then
+				out:insert(code)
+			end
 			-- TODO I guess that could be the typename if the nested node is a child node, smh...........
 			if subFieldName then
 				out:insert('-- ERROR: nested static-array has a name: '..subFieldName)
@@ -351,7 +362,11 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 				-- TODO make compound as a struct
 				--fieldType = makeTypeName(baseFieldName)
 				
-				fieldTypeStr, structType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName or ''), typesUsed) -- no trailing ;, no name, anonymous struct
+				fieldTypeStr, structType = makeStructNode(
+					fieldnode, 
+					--structName..'_'..makeTypeName(baseFieldName or ''), 
+					nil, -- no trailing ;, no name, anonymous struct
+					typesUsed)
 				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
 				return structType
 			end
@@ -406,13 +421,21 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 						-- here we don't have a ptrBaseType ...
 						-- in fact this is usually the point at which the perl code generates another nested structure
 						local structStr
-						structStr, ptrBaseType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName), typesUsed)
-						out:insert(structStr)
+						structStr, ptrBaseType = makeStructNode(
+							fieldnode,
+							(structName or 'Anon')..'_'..makeTypeName(baseFieldName),
+							typesUsed
+						)
+						if string.trim(structStr) ~= '' then
+							out:insert(structStr)
+						end
 					else
 						assert(#fieldnode.child == 1)
 						local code, subFieldName
 						code, subFieldName, ptrBaseType = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
-						out:insert(code)
+						if string.trim(code) ~= '' then
+							out:insert(code)
+						end
 						assert(Type:isa(ptrBaseType))
 						if subFieldName then
 							-- TODO it could be a nested type name
@@ -472,23 +495,24 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 	return out:concat'\n', fieldName, fieldType 
 end
 
-function makeStructNode(ch, structName, typesUsed)
+function makeStructNode(structNode, structName, typesUsed)
 	local out = table()
 
 	local result, structType = xpcall(function()
 
-		local parentType = htmlcommon.findattr(ch, 'inherits-from')
-		if not ch.child then
+		local parentType = htmlcommon.findattr(structNode, 'inherits-from')
+		if not structNode.child then
 			assert(parentType)
 			parentType = makeTypeName(parentType)
 			out:insert('typedef '..parentType..' '..structName..';')
 		else
+			local structVsUnion = htmlcommon.findattr(structNode, 'is-union') and 'union' or 'struct'
 			if structName then
-				out:insert('typedef struct '..structName..' {')
+				out:insert('typedef '..structVsUnion..' '..structName..' {')
 			else
-				out:insert('struct {')
+				out:insert(structVsUnion..' {')
 			end
-			for _,fieldnode in ipairs(ch.child) do
+			for _,fieldnode in ipairs(structNode.child) do
 				-- tag name is the c-type, name is the field name
 				if type(fieldnode) == 'table'
 				and fieldnode.type == 'tag'
@@ -502,10 +526,13 @@ function makeStructNode(ch, structName, typesUsed)
 						-- TODO make room for the vtable here
 					else
 						-- capture the first name
+						-- might be nil, esp for anonymous nested structs etc
 						baseFieldName = htmlcommon.findattr(fieldnode, 'name')
 					
 						local code, fieldName, fieldType = getTypeFromNode(fieldnode, structName, typesUsed)
-						out:insert(code)
+						if string.trim(code) ~= '' then
+							out:insert(code)
+						end
 						
 						assert(Type:isa(fieldType))
 						assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
@@ -516,7 +543,7 @@ function makeStructNode(ch, structName, typesUsed)
 						out:insert('\t'..fieldType:declare(fieldName or '')..';')
 						
 						-- TODO find which file has which type
-						typesUsed[makeTypeName(fieldType:getBase().name)] = true
+						fieldType:addTypeUsed(typesUsed)
 					end
 				end
 			end
@@ -535,7 +562,8 @@ function makeStructNode(ch, structName, typesUsed)
 		structType = Type(structName)
 	else
 		-- I think even nested structs will need name in LuaJIT
-		error("what to call this struct")
+		--error("what to call this struct")
+		structType = AnonStructType()
 	end
 	return out:concat'\n', structType
 end
@@ -589,7 +617,9 @@ for f in (dfhacksrcdir/'xml'):dir() do
 				out:insert"local ffi = require 'ffi'"
 				out:insert'ffi.cdef[['
 				local structStr = makeStructNode(ch, structName, typesUsed)
-				out:insert(structStr)
+				if string.trim(structStr) ~= '' then
+					out:insert(structStr)
+				end
 				out:insert']]'
 
 				out = table.keys(typesUsed):sort():mapi(function(t)
@@ -762,9 +792,10 @@ end
 local globalOutPath = (destdir/('globals.lua'))
 assert(not globalOutPath:exists(), "file "..globalOutPath.." already exists!")
 globalOutPath:write(table{
-"local ffi = require 'ffi'",
-"ffi.cdef[[",
-}:append(structDefs):append{
-"]]",
-}:append(globalObjDefs)
-:concat'\n'..'\n')
+		"local ffi = require 'ffi'",
+		"ffi.cdef[[",
+	}:append(structDefs):append{
+		"]]",
+	}:append(globalObjDefs)
+	:concat'\n'..'\n'
+)
