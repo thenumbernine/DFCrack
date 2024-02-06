@@ -284,7 +284,198 @@ local function makeEnumType(ch)
 	return out:concat'\n'
 end
 
-local function makeStructNode(ch, structName, typesUsed)
+local makeStructNode
+
+local baseFieldName
+local function getTypeFromNode(fieldnode, structName, typesUsed)
+	local fieldtag = fieldnode.tag
+
+	-- not present in static-array's deeper than the first ...
+	local fieldName = htmlcommon.findattr(fieldnode, 'name')
+	
+	-- this is employing several assumptions ...
+	baseFieldName = baseFieldName or fieldName
+	
+	local out = table()
+
+	-- try to get the type
+	local result, fieldType = assert(xpcall(function()
+
+		-- sometimes the type is in the tag name, some times it is in the type-name attribute ...
+		if fieldtag == 'static-array' then
+			
+			-- here, parse the children as if they were a type of their own
+			-- then append the arrayCount to what you get
+
+			local arrayCount = htmlcommon.findattr(fieldnode, 'count')
+			-- not specified? maybe it's in index-enum
+			if not arrayCount then
+				local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
+				if not indexEnum then
+					error("I don't know how to get the size of this array")
+				else
+					indexEnum = makeTypeName(indexEnum)
+					arrayCount = 'Num_'..indexEnum
+				end
+			end
+
+			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
+			if fieldTypeStr then
+				if fieldnode.chid then
+					error("got a static-array with both a type-name and a child node...")
+				end
+				return ArrayType(Type(fieldTypeStr), arrayCount)
+			end
+			-- TODO sometimes it's the first child, soemtimes it's ... type-name ? sometimes ... ?
+			local ptrTypeStr = htmlcommon.findattr(fieldnode, 'pointer-type')
+			if ptrTypeStr then
+				return ArrayType(PtrType(Type(ptrTypeStr)), arrayCount)
+			end
+			if not fieldnode.child 
+			or not fieldnode.child[1]
+			then 
+				error"failed to find children of static-array"
+			end
+			local code, subFieldName, fieldType = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
+			out:insert(code)
+			-- TODO I guess that could be the typename if the nested node is a child node, smh...........
+			if subFieldName then
+				out:insert('-- ERROR: nested static-array has a name: '..subFieldName)
+			end
+
+			return ArrayType(fieldType, arrayCount)
+			
+		elseif fieldtag == 'compound' then
+			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
+			if fieldTypeStr then
+				assert(not fieldnode.child, "found a compound with a type-name and with children ...")
+			else
+				assert(fieldnode.child, "found a compound without a type and without children...") 
+				-- TODO make compound as a struct
+				--fieldType = makeTypeName(baseFieldName)
+				
+				fieldTypeStr, structType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName or ''), typesUsed) -- no trailing ;, no name, anonymous struct
+				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
+				return structType
+			end
+			return Type(fieldTypeStr)
+		elseif fieldtag == 'bitfield' then
+			-- TODO sometimes this has a type-name attr , and then i guess it points to another def somewhere else .... smh just write it in C++ not XML
+			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
+				or htmlcommon.findattr(fieldnode, 'base-type')
+				or 'int32_t'	-- sometimes a bitfield has a name and some flag bits, but not base-type or type-name.  ex: cave_column_rectangle::unk_7
+			return Type(fieldTypeStr)
+		elseif fieldtag == 'stl-vector' then
+			local vecTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
+			-- TODO here, just handle reading of a single type field
+			if not vecTypeStr then
+				local ptrtype = htmlcommon.findattr(fieldnode, 'pointer-type')
+				if ptrtype then
+					return VecType(PtrType(Type(ptrtype)))
+				end
+			end
+			if not vecTypeStr then
+				-- see if it has just 1 child
+				-- smh how many ways do you need just to specify a type ...
+				if fieldnode.child
+				and #fieldnode.child == 1 
+				then
+					-- then try to read a single type from the ... smh
+					-- this xml doesn't distinguish between single-field structs and fields themselves
+					vecTypeStr = fieldnode.child[1].tag
+				end
+			end
+			-- TODO seems if no template is provided for std::vector then they just use void*
+			if not vecTypeStr then
+				return PtrType(Type'void')
+			end
+			return VecType(Type(vecTypeStr))
+		elseif fieldtag == 'pointer' then
+			-- why have attrs 'name' and 'type-name' at the same time?
+			local ptrBaseTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
+			--[[ not sure what this does at all
+			local isArray = htmlcommon.findattr(fieldnode, 'is-array') == 'true'
+			--]]
+			-- if it doen't have a type name then it better have children which can be deduced themselves
+			local ptrBaseType
+			if ptrBaseTypeStr then
+				ptrBaseType = Type(ptrBaseTypeStr)
+			else
+				if not fieldnode.child then
+					ptrBaseType = Type'void'
+				else
+					if #fieldnode.child > 1 then
+						out:insert'-- ERROR pointer to a structure?'
+						-- here we don't have a ptrBaseType ...
+						-- in fact this is usually the point at which the perl code generates another nested structure
+						local structStr
+						structStr, ptrBaseType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName), typesUsed)
+						out:insert(structStr)
+					else
+						assert(#fieldnode.child == 1)
+						local code, subFieldName
+						code, subFieldName, ptrBaseType = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
+						out:insert(code)
+						assert(Type:isa(ptrBaseType))
+						if subFieldName then
+							-- TODO it could be a nested type name
+							out:insert("-- ERROR: nested pointer has a name: "..subFieldName)
+						end
+					end
+				end
+			end
+			local fieldType = PtrType(ptrBaseType)
+			--[[
+			if isArray then
+				-- if it' an array then ... it's a double pointer?
+				-- .. *and* it's also defining a struct?  
+				-- what?
+				fieldType = fieldType .. ' *'
+			end
+			--]]
+			return fieldType
+		elseif fieldtag == 'enum' then
+			-- TODO here, if we have children, create a new type based on the children
+			-- and use the field name (and the struct name) as the enum name
+			-- and insert it before the struct
+			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
+			-- if no type-name, then ... base-type ... ?
+			-- and if base-type exists ... then ... 
+			-- ... use the name of the field of the parent node?  
+			-- which had beter be a static-array?
+			if fieldTypeStr then
+				assert(not fieldnode.child)
+			else
+				assert(fieldnode.child)
+				out:insert'-- TODO build a new inline enum here'
+				fieldTypeStr = htmlcommon.findattr(fieldnode, 'base-type') or 'int32_t'
+			end
+
+			assert(fieldTypeStr)
+
+			if fieldnode.child then
+				out:insert(' -- TODO need to insert an enum here for field '..baseFieldName)
+			end
+
+			return Type(fieldTypeStr)
+		elseif fieldtag == 'stl-string' then
+			return Type'stl-string'	-- gets translated in :getLuaName()
+		else
+			return Type(fieldtag)	-- prim
+		end
+	end, function(err)
+		return 'for field name '..tostring(fieldName)..'\n'
+			..'and base name '..tostring(baseFieldName)..'\n'
+			..'and current tag '..tostring(fieldnode.tag)..'\n'
+			..err..'\n'
+			..debug.traceback()
+	end))
+	if not result then error(fieldType) end
+	assert(Type:isa(fieldType))
+	return out:concat'\n', fieldName, fieldType 
+end
+
+function makeStructNode(ch, structName, typesUsed)
 	local out = table()
 
 	local result, structType = xpcall(function()
@@ -313,193 +504,10 @@ local function makeStructNode(ch, structName, typesUsed)
 					elseif fieldtag == 'virtual-methods' then
 						-- TODO make room for the vtable here
 					else
-						local baseFieldName
-						
-						local function getTypeFromNode(fieldnode)
-							local fieldtag = fieldnode.tag
-
-							-- not present in static-array's deeper than the first ...
-							local fieldName = htmlcommon.findattr(fieldnode, 'name')
-							
-							-- this is employing several assumptions ...
-							baseFieldName = baseFieldName or fieldName
-
-							-- try to get the type
-							local result, fieldType = assert(xpcall(function()
-						
-								-- sometimes the type is in the tag name, some times it is in the type-name attribute ...
-								if fieldtag == 'static-array' then
-									
-									-- here, parse the children as if they were a type of their own
-									-- then append the arrayCount to what you get
-
-									local arrayCount = htmlcommon.findattr(fieldnode, 'count')
-									-- not specified? maybe it's in index-enum
-									if not arrayCount then
-										local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
-										if not indexEnum then
-											error("I don't know how to get the size of this array")
-										else
-											indexEnum = makeTypeName(indexEnum)
-											arrayCount = 'Num_'..indexEnum
-										end
-									end
-
-									local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-									if fieldTypeStr then
-										if fieldnode.chid then
-											error("got a static-array with both a type-name and a child node...")
-										end
-										return ArrayType(Type(fieldTypeStr), arrayCount)
-									end
-									-- TODO sometimes it's the first child, soemtimes it's ... type-name ? sometimes ... ?
-									local ptrTypeStr = htmlcommon.findattr(fieldnode, 'pointer-type')
-									if ptrTypeStr then
-										return ArrayType(PtrType(Type(ptrTypeStr)), arrayCount)
-									end
-									if not fieldnode.child 
-									or not fieldnode.child[1]
-									then 
-										error"failed to find children of static-array"
-									end
-									local subFieldName, fieldType = getTypeFromNode(fieldnode.child[1])
-									-- TODO I guess that could be the typename if the nested node is a child node, smh...........
-									if subFieldName then
-										out:insert('-- ERROR: nested static-array has a name: '..subFieldName)
-									end
-
-									return ArrayType(fieldType, arrayCount)
-									
-								elseif fieldtag == 'compound' then
-									local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-									if fieldTypeStr then
-										assert(not fieldnode.child, "found a compound with a type-name and with children ...")
-									else
-										assert(fieldnode.child, "found a compound without a type and without children...") 
-										-- TODO make compound as a struct
-										--fieldType = makeTypeName(baseFieldName)
-										
-										fieldTypeStr, structType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName or ''), typesUsed) -- no trailing ;, no name, anonymous struct
-										out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
-										return structType
-									end
-									return Type(fieldTypeStr)
-								elseif fieldtag == 'bitfield' then
-									-- TODO sometimes this has a type-name attr , and then i guess it points to another def somewhere else .... smh just write it in C++ not XML
-									local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-										or htmlcommon.findattr(fieldnode, 'base-type')
-										or 'int32_t'	-- sometimes a bitfield has a name and some flag bits, but not base-type or type-name.  ex: cave_column_rectangle::unk_7
-									return Type(fieldTypeStr)
-								elseif fieldtag == 'stl-vector' then
-									local vecTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-									-- TODO here, just handle reading of a single type field
-									if not vecTypeStr then
-										local ptrtype = htmlcommon.findattr(fieldnode, 'pointer-type')
-										if ptrtype then
-											return VecType(PtrType(Type(ptrtype)))
-										end
-									end
-									if not vecTypeStr then
-										-- see if it has just 1 child
-										-- smh how many ways do you need just to specify a type ...
-										if fieldnode.child
-										and #fieldnode.child == 1 
-										then
-											-- then try to read a single type from the ... smh
-											-- this xml doesn't distinguish between single-field structs and fields themselves
-											vecTypeStr = fieldnode.child[1].tag
-										end
-									end
-									-- TODO seems if no template is provided for std::vector then they just use void*
-									if not vecTypeStr then
-										return PtrType(Type'void')
-									end
-									return VecType(Type(vecTypeStr))
-								elseif fieldtag == 'pointer' then
-									-- why have attrs 'name' and 'type-name' at the same time?
-									local ptrBaseTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-									--[[ not sure what this does at all
-									local isArray = htmlcommon.findattr(fieldnode, 'is-array') == 'true'
-									--]]
-									-- if it doen't have a type name then it better have children which can be deduced themselves
-									local ptrBaseType
-									if ptrBaseTypeStr then
-										ptrBaseType = Type(ptrBaseTypeStr)
-									else
-										if not fieldnode.child then
-											ptrBaseType = Type'void'
-										else
-											if #fieldnode.child > 1 then
-												out:insert'-- ERROR pointer to a structure?'
-												-- here we don't have a ptrBaseType ...
-												-- in fact this is usually the point at which the perl code generates another nested structure
-												local structStr
-												structStr, ptrBaseType = makeStructNode(fieldnode, structName..'_'..makeTypeName(baseFieldName), typesUsed)
-												out:insert(structStr)
-											else
-												assert(#fieldnode.child == 1)
-												local subFieldName
-												subFieldName, ptrBaseType = getTypeFromNode(fieldnode.child[1])
-												assert(Type:isa(ptrBaseType))
-												if subFieldName then
-													-- TODO it could be a nested type name
-													out:insert("-- ERROR: nested pointer has a name: "..subFieldName)
-												end
-											end
-										end
-									end
-									local fieldType = PtrType(ptrBaseType)
-									--[[
-									if isArray then
-										-- if it' an array then ... it's a double pointer?
-										-- .. *and* it's also defining a struct?  
-										-- what?
-										fieldType = fieldType .. ' *'
-									end
-									--]]
-									return fieldType
-								elseif fieldtag == 'enum' then
-									-- TODO here, if we have children, create a new type based on the children
-									-- and use the field name (and the struct name) as the enum name
-									-- and insert it before the struct
-									local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-									-- if no type-name, then ... base-type ... ?
-									-- and if base-type exists ... then ... 
-									-- ... use the name of the field of the parent node?  
-									-- which had beter be a static-array?
-									if fieldTypeStr then
-										assert(not fieldnode.child)
-									else
-										assert(fieldnode.child)
-										out:insert'-- TODO build a new inline enum here'
-										fieldTypeStr = htmlcommon.findattr(fieldnode, 'base-type') or 'int32_t'
-									end
-
-									assert(fieldTypeStr)
-
-									if fieldnode.child then
-										out:insert(' -- TODO need to insert an enum here for field '..baseFieldName)
-									end
-
-									return Type(fieldTypeStr)
-								elseif fieldtag == 'stl-string' then
-									return Type'stl-string'	-- gets translated in :getLuaName()
-								else
-									return Type(fieldtag)	-- prim
-								end
-							end, function(err)
-								return 'for field name '..tostring(fieldName)..'\n'
-									..'and base name '..tostring(baseFieldName)..'\n'
-									..'and current tag '..tostring(fieldnode.tag)..'\n'
-									..err..'\n'
-									..debug.traceback()
-							end))
-							if not result then error(fieldType) end
-							assert(Type:isa(fieldType))
-							return fieldName, fieldType 
-						end
-
-						local fieldName, fieldType = getTypeFromNode(fieldnode)
+						-- clear so we can capture the first
+						baseFieldName = nil
+						local code, fieldName, fieldType = getTypeFromNode(fieldnode, structName, typesUsed)
+						out:insert(code)
 						
 						assert(Type:isa(fieldType))
 						assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
@@ -536,6 +544,7 @@ end
 
 
 
+local globalObjDefs = table()
 local destdir = path'dfcrack/df'
 destdir:mkdir()
 for f in (dfhacksrcdir/'xml'):dir() do
@@ -560,6 +569,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 				assert(not outpath:exists(), "file "..outpath.." already exists!")
 				
 				local out = table()
+				out:insert"local ffi = require 'ffi'"
 				out:insert'ffi.cdef[['
 				out:insert(makeEnumType(ch))
 				out:insert']]'
@@ -641,95 +651,94 @@ for f in (dfhacksrcdir/'xml'):dir() do
 			
 
 			elseif ch.tag == 'global-object' then
+				-- accumulate these?
 
-error([[
-you are here.
-don't forget to straighten out what types get required.
-and then move the inline'd typedefs above to the global scope.
-]])
-				
 				-- TODO duplicate for struct and class below?
 				local name = htmlcommon.findattr(ch, 'name')
-				local typename = htmlcommon.findattr(ch, 'type-name')
 				local var = vars[name]
 				if not var then
-					ptrDefs:insert('-- global '..name..' has no address...')
-				elseif typename then
-					local comment = ({
-						bool = true,
-						int32_t = true,
-					})[typename] and '' or '--'
-					ptrDefs:insert(comment.."df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
+					globalObjDefs:insert('-- global '..name..' has no address...')
 				else
-					-- is a singleton structure
-					-- TODO dont do this? instead use the struct-type?
-					if not ch.child then
-					elseif #ch.child == 1 
-					and ch.child[1].type == 'tag'
-					then
-						local typenode = ch.child[1]
-						if typenode.tag == 'int32_t' then	-- or any other primitive...
-							local typename = typenode.tag
-							ptrDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
-						elseif typenode.tag == 'enum' then
-							-- only one field.  typedef.  maybe an enum.
-							-- how come the base-type is specified in the variable and not in the type definition?
-							local typename = htmlcommon.findattr(typenode, 'type-name')
-							local basetype = htmlcommon.findattr(typenode, 'base-type')
-							-- in fact for that reason, how about I don't make typedefs of enums ...
-							--print('ffi.cdef[[typedef '..basetype..' df_enum_'..typename..';]]')
-							-- typename will point to the enum info
-							-- basetype is the C type
-							ptrDefs:insert("df."..name.." = ffi.cast('"..basetype.."*', "..('0x%x'):format(var.addr)..")")
-						elseif typenode.tag == 'static-array' then
-							--[[ same here and stl-vector
-							-- type is either with 0-child in the attr ('type-name' for static-array)
-							-- or as a 1-child
-							local typename = assert(htmlcommon.findattr(typenode, 'type-name'), "static-array expected attr type-name")
-							local count = assert(htmlcommon.findattr(typenode, 'count'), "static-array expected attr count")
-							-- ok like C, luajit ffi doesn't let you just cast to array (or ... whats the syntax?)
-							-- but you can typedef arrays and then cast to that type ... as a pointer
-							-- so that if you do this, your subsequet derferences will need to be [0][index]
-							-- but its not like luajit or C bounds-checks anyways
-							-- so other than wasting typedefs, whats the point here?
-							-- but for record-keeping i just might make those typedefs later ...
-							--ptrDefs:insert("df."..name.." = ffi.cast('"..typename.."["..count.."]*', "..('0x%x'):format(var.addr)..")")
-							ptrDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
-							--]]
-							-- [[
-							ptrDefs:insert("-- df."..name.." = ffi.cast('static-array*', "..('0x%x'):format(var.addr)..")")
-							--]]
-						elseif typenode.tag == 'static-string' then
-							local size = assert(htmlcommon.findattr(typenode, 'size'), "static-string expected attr size")
-							--ptrDefs:insert("df."..name.." = ffi.cast('char["..size.."]*', "..('0x%x'):format(var.addr)..")")
-							ptrDefs:insert("df."..name.." = ffi.cast('char*', "..('0x%x'):format(var.addr)..")")
-						elseif typenode.tag == 'stl-vector' then
-							-- ok now we can have 0-children and attr pointer-type
-							-- or we can have 1 child with more info as to what the value refers to
-							ptrDefs:insert("-- df."..name.." = ffi.cast('vector<TODO>*', "..('0x%x'):format(var.addr)..")")
-						else
-							error('need to handle single-child singleton-type for global '..name)
-						end
+					-- TODO here read the type just like you would for any other struct-field
+--[==[
+					local typename = htmlcommon.findattr(ch, 'type-name')
+					if typename then
+						local comment = ({
+							bool = true,
+							int32_t = true,
+						})[typename] and '' or '--'
+						globalObjDefs:insert(comment.."df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
 					else
-						local structName = 'Global_'..makeTypeName(name)
-						structDefs:insert('typedef struct {')
-						for _,fieldnode in ipairs(ch.child) do
-							-- tag name is the c-type, name is the field name
-							if type(fieldnode) == 'table'
-							and fieldnode.type == 'tag'
-							then
-								local fieldName = htmlcommon.findattr(fieldnode, 'name')
-								assert(fieldName, "failed to find field name for singleton type of global "..tostring(name))
-								structDefs:insert('\t'..fieldnode.tag..' '..fieldName..';')
+						-- is a singleton structure
+						-- TODO dont do this? instead use the struct-type?
+						if not ch.child then
+						elseif #ch.child == 1 
+						and ch.child[1].type == 'tag'
+						then
+							local typenode = ch.child[1]
+							if typenode.tag == 'int32_t' then	-- or any other primitive...
+								local typename = typenode.tag
+								globalObjDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
+							elseif typenode.tag == 'enum' then
+								-- only one field.  typedef.  maybe an enum.
+								-- how come the base-type is specified in the variable and not in the type definition?
+								local typename = htmlcommon.findattr(typenode, 'type-name')
+								local basetype = htmlcommon.findattr(typenode, 'base-type')
+								-- in fact for that reason, how about I don't make typedefs of enums ...
+								--print('ffi.cdef[[typedef '..basetype..' df_enum_'..typename..';]]')
+								-- typename will point to the enum info
+								-- basetype is the C type
+								globalObjDefs:insert("df."..name.." = ffi.cast('"..basetype.."*', "..('0x%x'):format(var.addr)..")")
+							elseif typenode.tag == 'static-array' then
+								--[[ same here and stl-vector
+								-- type is either with 0-child in the attr ('type-name' for static-array)
+								-- or as a 1-child
+								local typename = assert(htmlcommon.findattr(typenode, 'type-name'), "static-array expected attr type-name")
+								local count = assert(htmlcommon.findattr(typenode, 'count'), "static-array expected attr count")
+								-- ok like C, luajit ffi doesn't let you just cast to array (or ... whats the syntax?)
+								-- but you can typedef arrays and then cast to that type ... as a pointer
+								-- so that if you do this, your subsequet derferences will need to be [0][index]
+								-- but its not like luajit or C bounds-checks anyways
+								-- so other than wasting typedefs, whats the point here?
+								-- but for record-keeping i just might make those typedefs later ...
+								--globalObjDefs:insert("df."..name.." = ffi.cast('"..typename.."["..count.."]*', "..('0x%x'):format(var.addr)..")")
+								globalObjDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
+								--]]
+								-- [[
+								globalObjDefs:insert("-- df."..name.." = ffi.cast('static-array*', "..('0x%x'):format(var.addr)..")")
+								--]]
+							elseif typenode.tag == 'static-string' then
+								local size = assert(htmlcommon.findattr(typenode, 'size'), "static-string expected attr size")
+								--globalObjDefs:insert("df."..name.." = ffi.cast('char["..size.."]*', "..('0x%x'):format(var.addr)..")")
+								globalObjDefs:insert("df."..name.." = ffi.cast('char*', "..('0x%x'):format(var.addr)..")")
+							elseif typenode.tag == 'stl-vector' then
+								-- ok now we can have 0-children and attr pointer-type
+								-- or we can have 1 child with more info as to what the value refers to
+								globalObjDefs:insert("-- df."..name.." = ffi.cast('vector<TODO>*', "..('0x%x'):format(var.addr)..")")
+							else
+								error('need to handle single-child singleton-type for global '..name)
 							end
+						else
+							local structName = 'Global_'..makeTypeName(name)
+							structDefs:insert('typedef struct {')
+							for _,fieldnode in ipairs(ch.child) do
+								-- tag name is the c-type, name is the field name
+								if type(fieldnode) == 'table'
+								and fieldnode.type == 'tag'
+								then
+									local fieldName = htmlcommon.findattr(fieldnode, 'name')
+									assert(fieldName, "failed to find field name for singleton type of global "..tostring(name))
+									structDefs:insert('\t'..fieldnode.tag..' '..fieldName..';')
+								end
+							end
+							structDefs:insert('} '..structName..';')
+							structDefs:insert'\n'
+							typename = structName
+							globalObjDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
 						end
-						structDefs:insert('} '..structName..';')
-						structDefs:insert'\n'
-						typename = structName
-						ptrDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
 					end
+--]==]
 				end
-
 
 			else
 				error("unknown node: "..require 'ext.tolua'{
@@ -752,3 +761,12 @@ and then move the inline'd typedefs above to the global scope.
 	end
 end
 
+local globalOutPath = (destdir/('globals.lua'))
+assert(not globalOutPath:exists(), "file "..globalOutPath.." already exists!")
+globalOutPath:write(table{
+"local ffi = require 'ffi'",
+"ffi.cdef[[",
+}:append(structDefs):append{
+"]]",
+}:append(globalObjDefs)
+:concat'\n'..'\n')
