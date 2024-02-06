@@ -293,9 +293,6 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 	-- not present in static-array's deeper than the first ...
 	local fieldName = htmlcommon.findattr(fieldnode, 'name')
 	
-	-- this is employing several assumptions ...
-	baseFieldName = baseFieldName or fieldName
-	
 	local out = table()
 
 	-- try to get the type
@@ -504,8 +501,9 @@ function makeStructNode(ch, structName, typesUsed)
 					elseif fieldtag == 'virtual-methods' then
 						-- TODO make room for the vtable here
 					else
-						-- clear so we can capture the first
-						baseFieldName = nil
+						-- capture the first name
+						baseFieldName = htmlcommon.findattr(fieldnode, 'name')
+					
 						local code, fieldName, fieldType = getTypeFromNode(fieldnode, structName, typesUsed)
 						out:insert(code)
 						
