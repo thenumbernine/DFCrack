@@ -298,9 +298,6 @@ local makeStructNode
 local baseFieldName
 local function getTypeFromNode(fieldnode, structName, typesUsed)
 	local fieldtag = fieldnode.tag
-
-	-- not present in static-array's deeper than the first ...
-	local fieldName = htmlcommon.findattr(fieldnode, 'name')
 	
 	local out = table()
 
@@ -342,13 +339,9 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 			then 
 				error"failed to find children of static-array"
 			end
-			local fieldType, code, subFieldName = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
+			local fieldType, code = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
 			if string.trim(code) ~= '' then
 				out:insert(code)
-			end
-			-- TODO I guess that could be the typename if the nested node is a child node, smh...........
-			if subFieldName then
-				out:insert('-- ERROR: nested static-array has a name: '..subFieldName)
 			end
 
 			return ArrayType(fieldType, arrayCount)
@@ -431,16 +424,12 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 						end
 					else
 						assert(#fieldnode.child == 1)
-						local code, subFieldName
-						ptrBaseType, code, subFieldName = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
+						local code
+						ptrBaseType, code = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
 						if string.trim(code) ~= '' then
 							out:insert(code)
 						end
 						assert(Type:isa(ptrBaseType))
-						if subFieldName then
-							-- TODO it could be a nested type name
-							out:insert("-- ERROR: nested pointer has a name: "..subFieldName)
-						end
 					end
 				end
 			end
@@ -484,15 +473,14 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 			return Type(fieldtag)	-- prim
 		end
 	end, function(err)
-		return 'for field name '..tostring(fieldName)..'\n'
-			..'and base name '..tostring(baseFieldName)..'\n'
+		return 'for base name '..tostring(baseFieldName)..'\n'
 			..'and current tag '..tostring(fieldnode.tag)..'\n'
 			..err..'\n'
 			..debug.traceback()
 	end))
 	if not result then error(fieldType) end
 	assert(Type:isa(fieldType))
-	return fieldType, out:concat'\n', fieldName
+	return fieldType, out:concat'\n'
 end
 
 function makeStructNode(structNode, structName, typesUsed)
@@ -525,14 +513,16 @@ function makeStructNode(structNode, structName, typesUsed)
 					elseif fieldtag == 'virtual-methods' then
 						-- TODO make room for the vtable here
 					else
-						-- capture the first name
-						-- might be nil, esp for anonymous nested structs etc
-						baseFieldName = htmlcommon.findattr(fieldnode, 'name')
-					
-						local fieldType, code, fieldName = getTypeFromNode(fieldnode, structName, typesUsed)
+						-- might be nil , should only be nil for anonymous struct/union's
+						local fieldName = htmlcommon.findattr(fieldnode, 'name')
+						-- capture the first name.  what to do if it's nil?
+						baseFieldName = fieldName
+
+						local fieldType, code = getTypeFromNode(fieldnode, structName, typesUsed)
 						if string.trim(code) ~= '' then
 							out:insert(code)
 						end
+						
 						
 						assert(Type:isa(fieldType))
 						assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
