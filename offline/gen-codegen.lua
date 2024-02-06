@@ -342,7 +342,7 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 			then 
 				error"failed to find children of static-array"
 			end
-			local code, subFieldName, fieldType = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
+			local fieldType, code, subFieldName = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
 			if string.trim(code) ~= '' then
 				out:insert(code)
 			end
@@ -432,7 +432,7 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 					else
 						assert(#fieldnode.child == 1)
 						local code, subFieldName
-						code, subFieldName, ptrBaseType = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
+						ptrBaseType, code, subFieldName = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
 						if string.trim(code) ~= '' then
 							out:insert(code)
 						end
@@ -492,7 +492,7 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 	end))
 	if not result then error(fieldType) end
 	assert(Type:isa(fieldType))
-	return out:concat'\n', fieldName, fieldType 
+	return fieldType, out:concat'\n', fieldName
 end
 
 function makeStructNode(structNode, structName, typesUsed)
@@ -529,7 +529,7 @@ function makeStructNode(structNode, structName, typesUsed)
 						-- might be nil, esp for anonymous nested structs etc
 						baseFieldName = htmlcommon.findattr(fieldnode, 'name')
 					
-						local code, fieldName, fieldType = getTypeFromNode(fieldnode, structName, typesUsed)
+						local fieldType, code, fieldName = getTypeFromNode(fieldnode, structName, typesUsed)
 						if string.trim(code) ~= '' then
 							out:insert(code)
 						end
