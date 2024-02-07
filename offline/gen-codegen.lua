@@ -330,7 +330,12 @@ I think the intended interpretation is, for a particular global-type/field-type/
 3) look for a single child element
 4) multiple child elements = implicit struct
 --]]
-local function getTypeFromAttrOrChildren(node, namespace, typesUsed)
+local function getTypeFromAttrOrChildren(
+	node,
+	namespace,
+	typesUsed,
+	structDefs
+)
 	-- this is always passed a value or variable
 	-- but sometimes from 
 	assert(namespace)
@@ -358,9 +363,10 @@ local function getTypeFromAttrOrChildren(node, namespace, typesUsed)
 		-- implicit inline struct
 		return makeStructNode(
 			node,
-			namespace:concat'_'..makeTypeName(baseFieldName or ''),
+			namespace:concat'_'..makeTypeName(baseFieldName or ''),	-- struct name
 			namespace,
-			typesUsed
+			typesUsed,
+			structDefs
 		)
 	end
 
@@ -401,7 +407,12 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 				end
 			end
 
-			local baseType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
+			local baseType, code = getTypeFromAttrOrChildren(
+				fieldnode,
+				namespace,
+				typesUsed,
+				structDefs
+			)
 			assert(baseType)
 			if code and string.trim(code) ~= '' then
 				out:insert(code)
@@ -417,9 +428,11 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 
 				structType, fieldTypeStr = makeStructNode(
 					fieldnode,
-					nil, -- no trailing ;, no name, anonymous struct
+					nil, -- no name = no trailing ;, anonymous inline struct
 					namespace,
-					typesUsed)
+					typesUsed,
+					structDefs
+				)
 				-- insert the anonymous nested struct
 				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
 				return structType
@@ -433,14 +446,24 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 			return Type(fieldTypeStr)
 		elseif fieldtag == 'stl-deque' then
 			-- uhhh ... same as stl-vector, sometimes no type-name nor pointer-type nor single-child-node are used, and an inline struct is implied
-			local templateType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
+			local templateType, code = getTypeFromAttrOrChildren(
+				fieldnode,
+				namespace,
+				typesUsed,
+				structDefs
+			)
 			assert(templateType)
 			if code and string.trim(code) ~= '' then
 				out:insert(code)
 			end
 			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
-			local templateType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
+			local templateType, code = getTypeFromAttrOrChildren(
+				fieldnode,
+				namespace,
+				typesUsed,
+				structDefs
+			)
 			-- stl-vector has default template-type of void*
 			templateType = templateType or PtrType(Type'void')
 			if code and string.trim(code) ~= '' then
@@ -451,7 +474,12 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 			local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
 			return Type'df-flagarray'
 		elseif fieldtag == 'pointer' then
-			local ptrBaseType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
+			local ptrBaseType, code = getTypeFromAttrOrChildren(
+				fieldnode,
+				namespace,
+				typesUsed,
+				structDefs
+			)
 			-- pointer has default base type of void, i.e. the pointer has a default type of void*
 			ptrBaseType = ptrBaseType or Type'void'
 			
@@ -511,10 +539,10 @@ structName = passed into this function, since it may or may not exist
 namespace = namespace
 typesUsed = used for recording require()'s
 --]]
-function makeStructNode(structNode, structName, namespace, typesUsed)
+function makeStructNode(structNode, structName, namespace, typesUsed, structDefs)
 	assert(typesUsed)
 
-	local structDefs = table()
+	local structCode = table()
 	local out = table()
 
 	local result, structType = xpcall(function()
@@ -569,12 +597,14 @@ function makeStructNode(structNode, structName, namespace, typesUsed)
 							--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
 
 							if string.trim(code) ~= '' then
+								-- TODO we don't just want one contiguous code for a single ffi.cdef
+								-- we want multiple ffi.cdef's with calls for building vectors, deques, etc in between
+								-- so how about instead of returning structs (except for anonymous structs)
+								-- how about collecting them in another location?
 								if AnonStructType:isa(fieldType) then
 									out:insert(code)
 								else
-									-- TODO we don't just want one contiguous code for a single ffi.cdef
-									-- we want multiple ffi.cdef's with calls for building vectors, deques, etc in between
-									structDefs:insert(code)
+									structCode:insert(code)
 								end
 							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
@@ -611,12 +641,12 @@ function makeStructNode(structNode, structName, namespace, typesUsed)
 	-- TODO the caller needs to ... sometimes ... put this at the top of the other defs
 	return structType,
 		(structName and (' /* begin struct def '..structName..' */\n') or '')
-		..table():append(structDefs, out):concat'\n'..'\n'
+		..table():append(structCode, out):concat'\n'..'\n'
 		..(structName and (' /* end struct def '..structName..' */\n') or '')
 end
 
 
-local globalStructDefs = table()
+local globalStructCode = table()
 local globalObjDefs = table()
 local globalTypesUsed = {}
 
@@ -667,13 +697,24 @@ for f in (dfhacksrcdir/'xml'):dir() do
 				local typesUsed = {}
 
 				out:insert"local ffi = require 'ffi'"
-				out:insert'ffi.cdef[['
-				local structType, structStr = makeStructNode(ch, structName, table{structName}, typesUsed)
-				if string.trim(structStr) ~= '' then
-					out:insert(structStr)
+				local structDefs = table()
+				local structType, code = makeStructNode(
+					ch,					-- xml node
+					structName,			-- struct name to insert into the struct code
+					table{structName},	-- namespace
+					typesUsed,
+					structDefs		-- collection of lua declarations. for inline structs and their templated-vector-generations to be inserted into
+				)
+				if string.trim(code) ~= '' then
+					structDefs:insert(code)
 				end
-				out:insert']]'
+				for _,code in ipairs(structDefs) do
+					out:insert'ffi.cdef[['
+					out:insert(code)
+					out:insert']]'
+				end
 
+				-- insert require() stmts
 				out:insert(1, buildTypesUsed(typesUsed))
 
 				outpath:write((
@@ -755,12 +796,21 @@ for f in (dfhacksrcdir/'xml'):dir() do
 						globalObjDefs:insert('-- global '..snakeToCamelCase(name)..' has no address...')
 					else
 						-- TODO here read the type just like you would for any other struct-field
-						local globalType, code = getTypeFromAttrOrChildren(ch, table{'Global'}, globalTypesUsed)
+						local globalStructDefs = table()
+						local globalType, code = getTypeFromAttrOrChildren(
+							ch,
+							table{'Global'},
+							globalTypesUsed,
+							globalStructDefs
+						)
 						assert(globalType)
 						assert(Type:isa(globalType))
 						globalType:addTypeUsed(globalTypesUsed)
 						if code and string.trim(code) ~= '' then
 							globalStructDefs:insert(code)
+						end
+						for _,code in ipairs(globalStructDefs) do
+							globalStructCode:insert(code)
 						end
 						globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
 					end
@@ -799,11 +849,11 @@ globalOutPath:write(
 		return s ~= '' and s or nil
 	end)() }
 	:append( (function()
-		if #globalStructDefs == 0 then return nil end
+		if #globalStructCode == 0 then return nil end
 		return table{
 			"local ffi = require 'ffi'",
 			"ffi.cdef[[",
-		}:append(globalStructDefs):append{
+		}:append(globalStructCode):append{
 			"]]",
 		}
 	end)() )
