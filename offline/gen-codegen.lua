@@ -283,41 +283,7 @@ local function buildTypesUsed(typesUsed)
 	end):concat'\n'
 end
 
--- make an enum type, write it to its respective file
-local function makeEnumType(node)
-	local out = table()
-	-- TODO doesn't have type-name for some nested enum inline type declarations ...
-	-- in those cases, pick the name from the struct and field name?
-	local enumTypeName = assert(htmlcommon.findattr(node, 'type-name'))
-	enumTypeName = makeTypeName(enumTypeName)
-	local enumBaseType = htmlcommon.findattr(node, 'base-type') or 'int32_t'
-	out:insert('typedef '..enumBaseType..' '..enumTypeName..';')
-	out:insert('enum {')
-	local anonIndex = 1
-	local lastEnumValue = -1
-	for _,fieldnode in ipairs(node.child) do
-		if fieldnode.type == 'tag' and fieldnode.tag == 'enum-item' then
-			local enumName = htmlcommon.findattr(fieldnode, 'name')
-			if enumName then
-				enumName = snakeToCamelCase(enumName)
-			else
-				enumName = 'anon'..anonIndex
-				anonIndex = anonIndex + 1
-			end
-			local enumValue = htmlcommon.findattr(fieldnode, 'value')
-			if enumValue then
-				enumValue = assert(tonumber(enumValue))
-				lastEnumValue = enumValue
-			else
-				lastEnumValue = lastEnumValue + 1	 -- track but don't write
-			end
-			out:insert('\t'..enumTypeName..'_'..enumName..(enumValue and (' = '..enumValue) or '')..',')
-		end
-	end
-	out:insert('\tNum_'..enumTypeName..' = '..lastEnumValue..',')
-	out:insert'};'
-	return out:concat'\n'
-end
+
 
 local makeStructNode
 local baseFieldName
@@ -356,7 +322,8 @@ local function getTypeFromAttrOrChildren(
 			return makeTypeNode(
 				ch, 
 				namespace,
-				typesUsed
+				typesUsed,
+				structDefs
 			)
 		end
 
@@ -375,7 +342,12 @@ local function getTypeFromAttrOrChildren(
 end
 
 -- hmm try to use getTypeFromAttrOrChildren more and makeTypeNode less
-function makeTypeNode(fieldnode, namespace, typesUsed)
+function makeTypeNode(
+	fieldnode,
+	namespace,
+	typesUsed,
+	structDefs
+)
 	assert(typesUsed)
 	local fieldtag = fieldnode.tag
 
@@ -539,10 +511,15 @@ structName = passed into this function, since it may or may not exist
 namespace = namespace
 typesUsed = used for recording require()'s
 --]]
-function makeStructNode(structNode, structName, namespace, typesUsed, structDefs)
+function makeStructNode(
+	structNode,
+	structName,
+	namespace,
+	typesUsed,
+	structDefs
+)
 	assert(typesUsed)
 
-	local structCode = table()
 	local out = table()
 
 	local result, structType = xpcall(function()
@@ -588,7 +565,12 @@ function makeStructNode(structNode, structName, namespace, typesUsed, structDefs
 
 							-- TODO can I safely call getTypeFromAttrOrChildren here?
 							-- or maybe I can't since too often the element is specifying the type in the tag name ...
-							local fieldType, code = makeTypeNode(fieldnode, fieldNamespace, typesUsed)
+							local fieldType, code = makeTypeNode(
+								fieldnode,
+								fieldNamespace,
+								typesUsed,
+								structDefs
+							)
 
 							assert(Type:isa(fieldType))
 							assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
@@ -604,7 +586,7 @@ function makeStructNode(structNode, structName, namespace, typesUsed, structDefs
 								if AnonStructType:isa(fieldType) then
 									out:insert(code)
 								else
-									structCode:insert(code)
+									structDefs:insert(code)
 								end
 							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
@@ -638,17 +620,166 @@ function makeStructNode(structNode, structName, namespace, typesUsed, structDefs
 		structType = AnonStructType()
 	end
 
-	-- TODO the caller needs to ... sometimes ... put this at the top of the other defs
-	return structType,
-		(structName and (' /* begin struct def '..structName..' */\n') or '')
-		..table():append(structCode, out):concat'\n'..'\n'
-		..(structName and (' /* end struct def '..structName..' */\n') or '')
+	return structType, out:concat'\n'
+end
+
+
+
+-- class that spits out a file of a certain type
+local Emitter = class()
+
+--[[
+args:
+	outpath = filename to spit this out to
+	out = table of lines to concat and write when we're done
+--]]
+function Emitter:init(args)
+	self.outpath = assert(args.outpath)
+	assert(not self.outpath:exists(), "file "..self.outpath.." already exists!")
+	self.out = table()
+end
+
+function Emitter:write()
+	self.outpath:write((
+		(self.out:concat'\n'..'\n'):gsub('}%s+;', '};')
+	))
+end
+
+
+local EnumEmitter = Emitter:subclass()
+
+-- make an enum type, write it to its respective file
+function EnumEmitter:process(node)
+	local out = self.out
+	out:insert"local ffi = require 'ffi'"
+	out:insert'ffi.cdef[['	
+
+	-- TODO doesn't have type-name for some nested enum inline type declarations ...
+	-- in those cases, pick the name from the struct and field name?
+	local enumTypeName = assert(htmlcommon.findattr(node, 'type-name'))
+	enumTypeName = makeTypeName(enumTypeName)
+	local enumBaseType = htmlcommon.findattr(node, 'base-type') or 'int32_t'
+	out:insert('typedef '..enumBaseType..' '..enumTypeName..';')
+	out:insert('enum {')
+	local anonIndex = 1
+	local lastEnumValue = -1
+	for _,fieldnode in ipairs(node.child) do
+		if fieldnode.type == 'tag' and fieldnode.tag == 'enum-item' then
+			local enumName = htmlcommon.findattr(fieldnode, 'name')
+			if enumName then
+				enumName = snakeToCamelCase(enumName)
+			else
+				enumName = 'anon'..anonIndex
+				anonIndex = anonIndex + 1
+			end
+			local enumValue = htmlcommon.findattr(fieldnode, 'value')
+			if enumValue then
+				enumValue = assert(tonumber(enumValue))
+				lastEnumValue = enumValue
+			else
+				lastEnumValue = lastEnumValue + 1	 -- track but don't write
+			end
+			out:insert('\t'..enumTypeName..'_'..enumName..(enumValue and (' = '..enumValue) or '')..',')
+		end
+	end
+	out:insert('\tNum_'..enumTypeName..' = '..lastEnumValue..',')
+	out:insert'};'
+	
+	out:insert']]'
+end
+
+
+local StructEmitter = Emitter:subclass()
+
+function StructEmitter:init(args)
+	StructEmitter.super.init(self, args)
+	self.structName = assert(args.structName)
+end
+
+function StructEmitter:process(ch)
+	local out = self.out
+	local typesUsed = {}
+
+	out:insert"local ffi = require 'ffi'"
+
+	-- collections of strings to be turned into ffi.cdef's
+	local structDefs = table()
+	
+	local structType, code = makeStructNode(
+		ch,					-- xml node
+		self.structName,			-- struct name to insert into the struct code
+		table{self.structName},	-- namespace
+		typesUsed,			-- collection of xml->lua types in other files that will need to be required
+		structDefs			-- collection of lua declarations. for inline structs and their templated-vector-generations to be inserted into
+	)
+	if string.trim(code) ~= '' then
+		-- need to also keep track of the code's typename
+		-- this way subsequent typedefs don't have colliding typenames (like we find in enabler)
+		structDefs:insert(code)
+	end
+	for _,code in ipairs(structDefs) do
+		out:insert'ffi.cdef[['
+		out:insert(code)
+		out:insert']]'
+	end
+
+	-- insert require() stmts
+	out:insert(1, buildTypesUsed(typesUsed))
+end
+
+
+local BitfieldEmitter = Emitter:subclass()
+
+function BitfieldEmitter:init(args)
+	BitfieldEmitter.super.init(self, args)
+	self.bitfieldName = assert(args.bitfieldName)
+end
+
+function BitfieldEmitter:process(ch)
+	local out = self.out
+
+	local basetype = htmlcommon.findattr(ch, 'base-type') or 'uint32_t'
+	
+	out:insert"local ffi = require 'ffi'"
+	out:insert"ffi.cdef[["
+	out:insert("typedef union "..self.bitfieldName.." {")
+	out:insert('\t'..basetype..' flags;')
+	out:insert('\tstruct {')
+	local totalBitCount = 0
+	local maxBits = bit.lshift(ffi.sizeof(basetype), 3)
+	local anonIndex = 1
+	for _,fieldnode in ipairs(ch.child) do
+		if fieldnode.type == 'tag' and fieldnode.tag == 'flag-bit' then
+			local fieldName = htmlcommon.findattr(fieldnode, 'name')
+			if fieldName then
+				fieldName = snakeToCamelCase(fieldName)
+			else
+				fieldName = 'anon' .. anonIndex
+				anonIndex = anonIndex + 1
+			end
+			local count = htmlcommon.findattr(fieldnode, 'count')
+			if count then
+				count = assert(tonumber(count), "got a count that wasn't a valid number")
+			else
+				count = 1
+			end
+			totalBitCount = totalBitCount + count
+			if totalBitCount > maxBits then
+				error("exceeded our base type number of bits")
+			end
+			out:insert('\t\t'..basetype..' '..fieldName..' : '..count..';')
+		end
+	end
+	out:insert('\t};')
+	out:insert("} "..self.bitfieldName..";")
+	out:insert"]]"
 end
 
 
 local globalStructCode = table()
 local globalObjDefs = table()
 local globalTypesUsed = {}
+
 
 local destdir = path'dfcrack/df'
 destdir:mkdir()
@@ -670,102 +801,34 @@ for f in (dfhacksrcdir/'xml'):dir() do
 			if ch.tag == 'enum-type' then
 				local enumTypeName = assert(htmlcommon.findattr(ch, 'type-name'))
 				enumTypeName = makeTypeName(enumTypeName)
-				local outpath = (destdir/(enumTypeName..'.lua'))
-				assert(not outpath:exists(), "file "..outpath.." already exists!")
-
-				local out = table()
-				out:insert"local ffi = require 'ffi'"
-				out:insert'ffi.cdef[['
-				out:insert(makeEnumType(ch))
-				out:insert']]'
-				outpath:write((
-					(out:concat'\n'..'\n'):gsub('}%s+;', '};')
-				))
-
+				local emit = EnumEmitter{
+					outpath = destdir/(enumTypeName..'.lua'),
+				}
+				emit:process(ch)
+				emit:write()
 			elseif ch.tag == 'class-type'
 			or ch.tag == 'struct-type'
 			then
-				local typeName = htmlcommon.findattr(ch, 'type-name')
-				-- matches global-object with >1 child
-				local structName = makeTypeName(typeName)
-				assert(structName)
-
-				local outpath = (destdir/(structName..'.lua'))
-				assert(not outpath:exists(), "file "..outpath.." already exists!")
-
-				local out = table()
-				local typesUsed = {}
-
-				out:insert"local ffi = require 'ffi'"
-				local structDefs = table()
-				local structType, code = makeStructNode(
-					ch,					-- xml node
-					structName,			-- struct name to insert into the struct code
-					table{structName},	-- namespace
-					typesUsed,
-					structDefs		-- collection of lua declarations. for inline structs and their templated-vector-generations to be inserted into
+				local structName = makeTypeName(
+					assert(htmlcommon.findattr(ch, 'type-name'))
 				)
-				if string.trim(code) ~= '' then
-					structDefs:insert(code)
-				end
-				for _,code in ipairs(structDefs) do
-					out:insert'ffi.cdef[['
-					out:insert(code)
-					out:insert']]'
-				end
 
-				-- insert require() stmts
-				out:insert(1, buildTypesUsed(typesUsed))
-
-				outpath:write((
-					(out:concat'\n'..'\n'):gsub('}%s+;', '};')
-				))
+				local emit = StructEmitter{
+					outpath = (destdir/(structName..'.lua')),
+					structName = structName,
+				}
+				emit:process(ch)
+				emit:write()
 
 			elseif ch.tag == 'bitfield-type' then
-				local typename = makeTypeName(assert(htmlcommon.findattr(ch, 'type-name')))
-				local basetype = htmlcommon.findattr(ch, 'base-type') or 'uint32_t'
+				local bitfieldName = makeTypeName(assert(htmlcommon.findattr(ch, 'type-name')))
 
-				local outpath = (destdir/(typename..'.lua'))
-				assert(not outpath:exists(), "file "..outpath.." already exists!")
-				local out = table()
-
-				out:insert"local ffi = require 'ffi'"
-				out:insert"ffi.cdef[["
-				out:insert("typedef union "..typename.." {")
-				out:insert('\t'..basetype..' flags;')
-				out:insert('\tstruct {')
-				local totalBitCount = 0
-				local maxBits = bit.lshift(ffi.sizeof(basetype), 3)
-				local anonIndex = 1
-				for _,fieldnode in ipairs(ch.child) do
-					if fieldnode.type == 'tag' and fieldnode.tag == 'flag-bit' then
-						local fieldName = htmlcommon.findattr(fieldnode, 'name')
-						if fieldName then
-							fieldName = snakeToCamelCase(fieldName)
-						else
-							fieldName = 'anon' .. anonIndex
-							anonIndex = anonIndex + 1
-						end
-						local count = htmlcommon.findattr(fieldnode, 'count')
-						if count then
-							count = assert(tonumber(count), "got a count that wasn't a valid number")
-						else
-							count = 1
-						end
-						totalBitCount = totalBitCount + count
-						if totalBitCount > maxBits then
-							error("exceeded our base type number of bits")
-						end
-						out:insert('\t\t'..basetype..' '..fieldName..' : '..count..';')
-					end
-				end
-				out:insert('\t};')
-				out:insert("} "..typename..";")
-				out:insert"]]"
-
-				outpath:write((
-					(out:concat'\n'..'\n'):gsub('}%s+;', '};')
-				))
+				local emit = BitfieldEmitter{
+					outpath = (destdir/(bitfieldName..'.lua')),
+					bitfieldName = bitfieldName,
+				}
+				emit:process(ch)
+				emit:write()
 
 			elseif ch.tag == 'df-linked-list-type' then
 			elseif ch.tag == 'df-other-vectors-type' then
@@ -840,10 +903,10 @@ for f in (dfhacksrcdir/'xml'):dir() do
 	end
 end
 
-local globalOutPath = (destdir/('globals.lua'))
-assert(not globalOutPath:exists(), "file "..globalOutPath.." already exists!")
-globalOutPath:write(
-	table()
+local globalEmitter = Emitter{
+	outpath = (destdir/('globals.lua')),
+}
+globalEmitter.out = table()
 	:append{ (function()
 		local s = string.trim(buildTypesUsed(globalTypesUsed))
 		return s ~= '' and s or nil
@@ -864,5 +927,5 @@ globalOutPath:write(
 	:append{
 		"return df",
 	}
-	:concat'\n'..'\n'
-)
+	
+globalEmitter:write()
