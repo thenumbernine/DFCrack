@@ -285,9 +285,31 @@ end
 
 
 
-local makeStructNode
+
+-- class that spits out a file of a certain type
+local Emitter = class()
+
+--[[
+args:
+	outpath = filename to spit this out to
+	out = table of lines to concat and write when we're done
+--]]
+function Emitter:init(args)
+	self.outpath = assert(args.outpath)
+	assert(not self.outpath:exists(), "file "..self.outpath.." already exists!")
+	
+	self.out = table()
+	self.typesUsed = {}
+end
+
+function Emitter:write()
+	self.outpath:write((
+		(self.out:concat'\n'..'\n'):gsub('}%s+;', '};')
+	))
+end
+
+
 local baseFieldName
-local makeTypeNode
 
 --[[
 I think the intended interpretation is, for a particular global-type/field-type/templated-type is ...
@@ -296,7 +318,7 @@ I think the intended interpretation is, for a particular global-type/field-type/
 3) look for a single child element
 4) multiple child elements = implicit struct
 --]]
-local function getTypeFromAttrOrChildren(
+function Emitter:getTypeFromAttrOrChildren(
 	node,
 	namespace,
 	typesUsed,
@@ -319,7 +341,7 @@ local function getTypeFromAttrOrChildren(
 		if #node.child == 1 then
 			local ch = node.child[1]
 			assert(ch.type == 'tag')
-			return makeTypeNode(
+			return self:makeTypeNode(
 				ch, 
 				namespace,
 				typesUsed,
@@ -328,7 +350,7 @@ local function getTypeFromAttrOrChildren(
 		end
 
 		-- implicit inline struct
-		return makeStructNode(
+		return self:makeStructNode(
 			node,
 			namespace:concat'_'..makeTypeName(baseFieldName or ''),	-- struct name
 			namespace,
@@ -341,8 +363,8 @@ local function getTypeFromAttrOrChildren(
 	return nil, ''
 end
 
--- hmm try to use getTypeFromAttrOrChildren more and makeTypeNode less
-function makeTypeNode(
+-- hmm try to use getTypeFromAttrOrChildren more and self:makeTypeNode less
+function Emitter:makeTypeNode(
 	fieldnode,
 	namespace,
 	typesUsed,
@@ -379,7 +401,7 @@ function makeTypeNode(
 				end
 			end
 
-			local baseType, code = getTypeFromAttrOrChildren(
+			local baseType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
 				namespace,
 				typesUsed,
@@ -398,7 +420,7 @@ function makeTypeNode(
 			else
 				assert(fieldnode.child, "found a compound without a type and without children...")
 
-				structType, fieldTypeStr = makeStructNode(
+				structType, fieldTypeStr = self:makeStructNode(
 					fieldnode,
 					nil, -- no name = no trailing ;, anonymous inline struct
 					namespace,
@@ -418,7 +440,7 @@ function makeTypeNode(
 			return Type(fieldTypeStr)
 		elseif fieldtag == 'stl-deque' then
 			-- uhhh ... same as stl-vector, sometimes no type-name nor pointer-type nor single-child-node are used, and an inline struct is implied
-			local templateType, code = getTypeFromAttrOrChildren(
+			local templateType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
 				namespace,
 				typesUsed,
@@ -430,7 +452,7 @@ function makeTypeNode(
 			end
 			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
-			local templateType, code = getTypeFromAttrOrChildren(
+			local templateType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
 				namespace,
 				typesUsed,
@@ -446,7 +468,7 @@ function makeTypeNode(
 			local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
 			return Type'df-flagarray'
 		elseif fieldtag == 'pointer' then
-			local ptrBaseType, code = getTypeFromAttrOrChildren(
+			local ptrBaseType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
 				namespace,
 				typesUsed,
@@ -511,7 +533,7 @@ structName = passed into this function, since it may or may not exist
 namespace = namespace
 typesUsed = used for recording require()'s
 --]]
-function makeStructNode(
+function Emitter:makeStructNode(
 	structNode,
 	structName,
 	namespace,
@@ -563,9 +585,9 @@ function makeStructNode(
 							-- since most inline structs are named by their fields ...
 							local fieldNamespace = table(namespace) --:append{fieldName and makeTypeName(fieldName)}
 
-							-- TODO can I safely call getTypeFromAttrOrChildren here?
+							-- TODO can I safely call self:getTypeFromAttrOrChildren here?
 							-- or maybe I can't since too often the element is specifying the type in the tag name ...
-							local fieldType, code = makeTypeNode(
+							local fieldType, code = self:makeTypeNode(
 								fieldnode,
 								fieldNamespace,
 								typesUsed,
@@ -625,27 +647,6 @@ end
 
 
 
--- class that spits out a file of a certain type
-local Emitter = class()
-
---[[
-args:
-	outpath = filename to spit this out to
-	out = table of lines to concat and write when we're done
---]]
-function Emitter:init(args)
-	self.outpath = assert(args.outpath)
-	assert(not self.outpath:exists(), "file "..self.outpath.." already exists!")
-	self.out = table()
-end
-
-function Emitter:write()
-	self.outpath:write((
-		(self.out:concat'\n'..'\n'):gsub('}%s+;', '};')
-	))
-end
-
-
 local EnumEmitter = Emitter:subclass()
 
 -- make an enum type, write it to its respective file
@@ -698,18 +699,17 @@ end
 
 function StructEmitter:process(ch)
 	local out = self.out
-	local typesUsed = {}
 
 	out:insert"local ffi = require 'ffi'"
 
 	-- collections of strings to be turned into ffi.cdef's
 	local structDefs = table()
 	
-	local structType, code = makeStructNode(
+	local structType, code = self:makeStructNode(
 		ch,					-- xml node
 		self.structName,			-- struct name to insert into the struct code
 		table{self.structName},	-- namespace
-		typesUsed,			-- collection of xml->lua types in other files that will need to be required
+		self.typesUsed,			-- collection of xml->lua types in other files that will need to be required
 		structDefs			-- collection of lua declarations. for inline structs and their templated-vector-generations to be inserted into
 	)
 	if string.trim(code) ~= '' then
@@ -724,7 +724,7 @@ function StructEmitter:process(ch)
 	end
 
 	-- insert require() stmts
-	out:insert(1, buildTypesUsed(typesUsed))
+	out:insert(1, buildTypesUsed(self.typesUsed))
 end
 
 
@@ -776,13 +776,16 @@ function BitfieldEmitter:process(ch)
 end
 
 
-local globalStructCode = table()
-local globalObjDefs = table()
-local globalTypesUsed = {}
-
-
 local destdir = path'dfcrack/df'
 destdir:mkdir()
+
+local globalStructCode = table()
+local globalObjDefs = table()
+local globalEmitter = Emitter{
+	outpath = (destdir/('globals.lua')),
+}
+local globalTypesUsed = globalEmitter.typesUsed
+
 for f in (dfhacksrcdir/'xml'):dir() do
 	io.stderr:write('processing ', f.path, '\n')
 	local res, err = xpcall(function()
@@ -860,7 +863,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 					else
 						-- TODO here read the type just like you would for any other struct-field
 						local globalStructDefs = table()
-						local globalType, code = getTypeFromAttrOrChildren(
+						local globalType, code = globalEmitter:getTypeFromAttrOrChildren(
 							ch,
 							table{'Global'},
 							globalTypesUsed,
@@ -903,9 +906,6 @@ for f in (dfhacksrcdir/'xml'):dir() do
 	end
 end
 
-local globalEmitter = Emitter{
-	outpath = (destdir/('globals.lua')),
-}
 globalEmitter.out = table()
 	:append{ (function()
 		local s = string.trim(buildTypesUsed(globalTypesUsed))
