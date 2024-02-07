@@ -12,6 +12,8 @@ local path = require 'ext.path'
 local table = require 'ext.table'
 local string = require 'ext.string'
 
+local thisDFVersion = 'v0.47.05'
+
 local dfhacksrcdir = path'../../other/dfhack-0.47.05-r8/library/'
 
 local htmlparser = require 'htmlparser'
@@ -43,7 +45,7 @@ local symbols = htmlparser.parse(assert((dfhacksrcdir/'xml/symbols.xml'):read())
 local symbolsDataDef = require 'htmlparser.xpath'(symbols, '/data-definition')[1]
 
 local symbolsArch = htmlcommon.findchild(symbolsDataDef, 'symbol-table', {
-	name = 'v0.47.05 '..dfhack_osarch,
+	name = thisDFVersion..' '..dfhack_osarch,
 	['os-type'] = dfhack_os,
 })
 for _,ch in ipairs(symbolsArch.child) do
@@ -510,35 +512,39 @@ function makeStructNode(structNode, structName, typesUsed)
 				if type(fieldnode) == 'table'
 				and fieldnode.type == 'tag'
 				then
-					local fieldtag = fieldnode.tag
-					-- ignore some tags
-					if fieldtag == 'custom-methods' then
-					elseif fieldtag == 'extra-include' then
-					elseif fieldtag == 'code-helper' then
-					elseif fieldtag == 'virtual-methods' then
-						-- TODO make room for the vtable here
-					else
-						-- might be nil , should only be nil for anonymous struct/union's
-						local fieldName = htmlcommon.findattr(fieldnode, 'name')
-						-- capture the first name.  what to do if it's nil?
-						baseFieldName = fieldName
+					-- remove fields that don't belong to this version
+					local since = htmlcommon.findattr(fieldnode, 'since')
+					if not since or since <= thisDFVersion then
+						local fieldtag = fieldnode.tag
+						-- ignore some tags
+						if fieldtag == 'custom-methods' then
+						elseif fieldtag == 'extra-include' then
+						elseif fieldtag == 'code-helper' then
+						elseif fieldtag == 'virtual-methods' then
+							-- TODO make room for the vtable here
+						else
+							-- might be nil , should only be nil for anonymous struct/union's
+							local fieldName = htmlcommon.findattr(fieldnode, 'name')
+							-- capture the first name.  what to do if it's nil?
+							baseFieldName = fieldName
 
-						local fieldType, code = makeTypeNode(fieldnode, structName, typesUsed)
-						if string.trim(code) ~= '' then
-							out:insert(code)
+							local fieldType, code = makeTypeNode(fieldnode, structName, typesUsed)
+							if string.trim(code) ~= '' then
+								out:insert(code)
+							end
+
+
+							assert(Type:isa(fieldType))
+							assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
+							-- and not unlike the globals,
+							-- if no type is specified then we just assume it's an anonymous struct/union
+							--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
+
+							out:insert('\t'..fieldType:declare(fieldName or '')..';')
+
+							-- TODO find which file has which type
+							fieldType:addTypeUsed(typesUsed)
 						end
-
-
-						assert(Type:isa(fieldType))
-						assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
-						-- and not unlike the globals,
-						-- if no type is specified then we just assume it's an anonymous struct/union
-						--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
-
-						out:insert('\t'..fieldType:declare(fieldName or '')..';')
-
-						-- TODO find which file has which type
-						fieldType:addTypeUsed(typesUsed)
 					end
 				end
 			end
@@ -680,10 +686,15 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 
 			elseif ch.tag == 'global-object' then
+				
 				-- accumulate these
 
 				-- TODO duplicate for struct and class below?
 				local name = htmlcommon.findattr(ch, 'name')
+				local since = htmlcommon.findattr(ch, 'since')
+				if since then
+					error("haven't got this handled yet") -- cuz no one is using it yet ...
+				end
 
 				assert(xpcall(function()
 
