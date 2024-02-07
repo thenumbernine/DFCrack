@@ -307,6 +307,13 @@ local makeStructNode
 local baseFieldName
 local makeTypeNode
 
+local tagToTypeTable = {
+	['s-float'] = 'float',
+}
+local function tagToType(tag)
+	return tagToTypeTable[tag] or tag
+end
+
 --[[
 I think the intended interpretation is, for a particular global-type/field-type/templated-type is ...
 1) look at attr type-name
@@ -316,6 +323,7 @@ I think the intended interpretation is, for a particular global-type/field-type/
 --]]
 local function getTypeFromAttrOrChildren(node, structName, typesUsed)
 	local typeName = htmlcommon.findattr(node, 'type-name')
+	typeName = tagToType(typeName)
 	if typeName then return Type(typeName) end
 	
 	local pointerType = htmlcommon.findattr(node, 'pointer-type')
@@ -344,12 +352,6 @@ local function getTypeFromAttrOrChildren(node, structName, typesUsed)
 
 	-- no type
 	return nil, nil
-end
-
-local function tagToType(tag)
-	return ({
-		['s-float'] = float,
-	})[tag] or tag
 end
 
 function makeTypeNode(fieldnode, structName, typesUsed)
@@ -384,28 +386,12 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 				end
 			end
 
-			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-			if fieldTypeStr then
-				if fieldnode.chid then
-					error("got a static-array with both a type-name and a child node...")
-				end
-				return ArrayType(Type(fieldTypeStr), arrayCount)
-			end
-			-- TODO sometimes it's the first child, soemtimes it's ... type-name ? sometimes ... ?
-			local ptrTypeStr = htmlcommon.findattr(fieldnode, 'pointer-type')
-			if ptrTypeStr then
-				return ArrayType(PtrType(Type(ptrTypeStr)), arrayCount)
-			end
-			if not fieldnode.child
-			or not fieldnode.child[1]
-			then
-				error"failed to find children of static-array"
-			end
-			local fieldType, code = makeTypeNode(fieldnode.child[1], structName, typesUsed)
-			if string.trim(code) ~= '' then
+			local baseType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
+			assert(baseType)
+			if code and string.trim(code) ~= '' then
 				structDefs:insert(code)
 			end
-			return ArrayType(fieldType, arrayCount)
+			return ArrayType(baseType, arrayCount)
 
 		elseif fieldtag == 'compound' then
 			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
@@ -439,61 +425,22 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
 			local templateType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
-			-- stl-vector has default type of void*
+			-- stl-vector has default template-type of void*
 			templateType = templateType or PtrType(Type'void')
 			if code and string.trim(code) ~= '' then
 				structDefs:insert(code)
 			end
 			return STLVectorType(templateType)
 		elseif fieldtag == 'pointer' then
-			-- why have attrs 'name' and 'type-name' at the same time?
-			local ptrBaseTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
+			local ptrBaseType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
+			-- pointer has default base type of void, i.e. the pointer has a default type of void*
+			ptrBaseType = ptrBaseType or Type'void'
+
 			--[[ not sure what this does at all
 			local isArray = htmlcommon.findattr(fieldnode, 'is-array') == 'true'
 			--]]
-			-- if it doen't have a type name then it better have children which can be deduced themselves
-			local ptrBaseType
-			if ptrBaseTypeStr then
-				ptrBaseType = Type(ptrBaseTypeStr)
-			else
-				if not fieldnode.child then
-					ptrBaseType = Type'void'
-				else
-					-- implicit compound / anonymous struct
-					if #fieldnode.child > 1 then
-						out:insert'-- ERROR pointer to a structure?'
-						-- here we don't have a ptrBaseType ...
-						-- in fact this is usually the point at which the perl code generates another nested structure
-						local structStr
-						ptrBaseType, structStr = makeStructNode(
-							fieldnode,
-							(structName or 'Anon')..'_'..makeTypeName(baseFieldName),
-							typesUsed
-						)
-						if string.trim(structStr) ~= '' then
-							structDefs:insert(structStr)
-						end
-					else
-						assert(#fieldnode.child == 1)
-						local code
-						ptrBaseType, code = makeTypeNode(fieldnode.child[1], structName, typesUsed)
-						if string.trim(code) ~= '' then
-							structDefs:insert(code)
-						end
-						assert(Type:isa(ptrBaseType))
-					end
-				end
-			end
-			local fieldType = PtrType(ptrBaseType)
-			--[[
-			if isArray then
-				-- if it' an array then ... it's a double pointer?
-				-- .. *and* it's also defining a struct?
-				-- what?
-				fieldType = fieldType .. ' *'
-			end
-			--]]
-			return fieldType
+			
+			return PtrType(ptrBaseType)
 		elseif fieldtag == 'enum' then
 			-- TODO here, if we have children, create a new type based on the children
 			-- and use the field name (and the struct name) as the enum name
@@ -519,7 +466,7 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 
 			return Type(fieldTypeStr)
 		elseif fieldtag == 'stl-string' then
-			return Type'stl-string'	-- gets translated in :getLuaName()
+			return Type'stl-string'
 		else
 			return Type(tagToType(fieldtag))	-- prim
 		end
@@ -664,9 +611,9 @@ for f in (dfhacksrcdir/'xml'):dir() do
 			elseif ch.tag == 'class-type'
 			or ch.tag == 'struct-type'
 			then
-				local typename = htmlcommon.findattr(ch, 'type-name')
+				local typeName = htmlcommon.findattr(ch, 'type-name')
 				-- matches global-object with >1 child
-				local structName = makeTypeName(typename)
+				local structName = makeTypeName(typeName)
 
 				local outpath = (destdir/(structName..'.lua'))
 				assert(not outpath:exists(), "file "..outpath.." already exists!")
@@ -759,52 +706,14 @@ for f in (dfhacksrcdir/'xml'):dir() do
 						globalObjDefs:insert('-- global '..snakeToCamelCase(name)..' has no address...')
 					else
 						-- TODO here read the type just like you would for any other struct-field
-						local typename = htmlcommon.findattr(ch, 'type-name')
-						if typename then
-							local globalType = Type(typename)
-							globalType:addTypeUsed(globalTypesUsed)
-							globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
-						else
-							-- how is pointer-type different than type-name for global-object?
-							-- both are the type of the memory at the location?
-							-- shouldn't either all be
-							local ptrtype = htmlcommon.findattr(ch, 'pointer-type')
-							if ptrtype then
-								local globalType = PtrType(Type(ptrtype))
-								globalType:addTypeUsed(globalType)
-								globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
-							else
-								-- if we have more than 1 child then create a struct
-								-- and in that case, struct name = global name ... hmmmm
-								if not ch.child then
-									error("got a global with no children and no type-name and no pointer-type")
-								elseif #ch.child == 1 then
-									-- read as a type
-									local globalType, code = makeTypeNode(
-										ch.child[1],
-										nil,
-										globalTypesUsed
-									)
-									assert(Type:isa(globalType))
-									globalType:addTypeUsed(globalType)
-									assert(string.trim(code) == '')
-									globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
-								else
-									-- read as a struct
-									local globalType, code = makeStructNode(
-										ch,
-										makeTypeName(name),
-										globalTypesUsed
-									)
-									assert(Type:isa(globalType))
-									globalType:addTypeUsed(globalType)
-									if string.trim(code) ~= '' then
-										globalStructDefs:insert(code)
-									end
-									globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
-								end
-							end
+						local globalType, code = getTypeFromAttrOrChildren(ch, 'Global', globalTypesUsed)
+						assert(globalType)
+						assert(Type:isa(globalType))
+						globalType:addTypeUsed(globalTypesUsed)
+						if code and string.trim(code) ~= '' then
+							globalStructDefs:insert(code)
 						end
+						globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
 					end
 				end, function(err)
 					return 'for global '..name..'\n'
