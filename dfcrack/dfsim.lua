@@ -9,8 +9,14 @@ require 'ffi.req' 'c.pthread'
 local pthread = ffi.C
 --]]
 
--- TODO clean this up
+--[[ here's the by-hand port of the headers to luajit ...
 local df = require 'mem'
+--]]
+-- [[ here's me working on the xml->luajit port
+local df = require 'df.globals'
+--]]
+
+print('dfcrack df.version', df.version, df.version[0])
 
 local dfsim = {}
 
@@ -21,7 +27,6 @@ function dfsim.update()
 	print(('dfmain.update pthread_self: %x'):format(pthread.pthread_self()))
 --]]
 	-- works
---	print('version', df.version, df.version[0])
 	-- works
 --	print('cursor', df.cursor[0])
 

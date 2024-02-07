@@ -240,14 +240,25 @@ function PtrType:makeLuaName()
 	return self.base:makeLuaName()..' *'
 end
 
-local VecType = Type:subclass()
-function VecType:init(T)
+local STLVectorType = Type:subclass()
+function STLVectorType:init(T)
 	assert(Type:isa(T))
-	self.T = assert(T)
+	self.T = T
 end
-function VecType:getBase() return self.T:getBase() end
-function VecType:makeLuaName()
+function STLVectorType:getBase() return self.T:getBase() end
+function STLVectorType:makeLuaName()
+	-- TODO the suffix substitution will screw up for vector-of-pointers-to-fixed-size-arrays
 	return 'vector_'..self.T:makeLuaName():gsub(' %*', '_ptr')
+end
+
+local STLDequeType = Type:subclass()
+function STLDequeType:init(T)
+	assert(Type:isa(T))
+	self.T = T
+end
+function STLDequeType:getBase() return self.T:getBase() end
+function STLDequeType:makeLuaName()
+	return 'deque_'..self.T:makeLuaName():gsub(' %*', '_ptr')
 end
 
 
@@ -293,12 +304,59 @@ local function makeEnumType(ch)
 end
 
 local makeStructNode
-
 local baseFieldName
-local function makeTypeNode(fieldnode, structName, typesUsed)
+local makeTypeNode
+
+--[[
+I think the intended interpretation is, for a particular global-type/field-type/templated-type is ...
+1) look at attr type-name
+2) look at attr pointer-type , then treat this as ({type-name} *) 
+3) look for a single child element
+4) multiple child elements = implicit struct
+--]]
+local function getTypeFromAttrOrChildren(node, structName, typesUsed)
+	local typeName = htmlcommon.findattr(node, 'type-name')
+	if typeName then return Type(typeName) end
+	
+	local pointerType = htmlcommon.findattr(node, 'pointer-type')
+	if pointerType then return PtrType(Type(pointerType)) end
+
+	if node.child then
+		assert(#node.child > 0)
+		
+		-- single child node is the type ... not a struct of a single child as xml layout in other places might imply ...
+		if #node.child == 1 then
+			local ch = node.child[1]
+			assert(ch.type == 'tag')
+			return makeTypeNode(
+				ch, 
+				(structName or 'Anon')..'_'..makeTypeName(baseFieldName or ''),
+				typesUsed)
+		end
+
+		-- implicit inline struct
+		return makeStructNode(
+			node,
+			(structName or 'Anon')..'_'..makeTypeName(baseFieldName or ''),
+			typesUsed
+		)
+	end
+
+	-- no type
+	return nil, nil
+end
+
+local function tagToType(tag)
+	return ({
+		['s-float'] = float,
+	})[tag] or tag
+end
+
+function makeTypeNode(fieldnode, structName, typesUsed)
 	assert(typesUsed)
 	local fieldtag = fieldnode.tag
 
+	local structDefs = table()
 	local out = table()
 
 	-- try to get the type
@@ -345,9 +403,8 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 			end
 			local fieldType, code = makeTypeNode(fieldnode.child[1], structName, typesUsed)
 			if string.trim(code) ~= '' then
-				out:insert(code)
+				structDefs:insert(code)
 			end
-
 			return ArrayType(fieldType, arrayCount)
 
 		elseif fieldtag == 'compound' then
@@ -372,34 +429,22 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 				or htmlcommon.findattr(fieldnode, 'base-type')
 				or 'int32_t'	-- sometimes a bitfield has a name and some flag bits, but not base-type or type-name.  ex: cave_column_rectangle::unk_7
 			return Type(fieldTypeStr)
+		elseif fieldtag == 'stl-deque' then
+			-- uhhh ... same as stl-vector, sometimes no type-name nor pointer-type nor single-child-node are used, and an inline struct is implied
+			local templateType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
+			assert(templateType)
+			if code and string.trim(code) ~= '' then
+				structDefs:insert(code)
+			end
+			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
-			-- TODO Here just call gettypenode on the stl-vector element
-			-- maybe it's the case for all fields/types that ...
-			-- ... 'type-name' means its subtype is the typename provided
-			-- ... 'pointer-type' means the sub-type is a pointer to the typename provided
-			-- ... neither?  a single child means the typename is the tag fo the single-child (how to declare structs of single elements?  right up there with javascript exec()'s implicit-return shortcomings)
-			-- ... multiple children imply a struct.  name on the struct implies struct-name, no-name implies inline struct.
-
-			local vecTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-			if vecTypeStr then
-				return VecType(Type(vecTypeStr))
+			local templateType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
+			-- stl-vector has default type of void*
+			templateType = templateType or PtrType(Type'void')
+			if code and string.trim(code) ~= '' then
+				structDefs:insert(code)
 			end
-			-- TODO here, just handle reading of a single type field
-			local ptrtype = htmlcommon.findattr(fieldnode, 'pointer-type')
-			if ptrtype then
-				return VecType(PtrType(Type(ptrtype)))
-			end
-			-- see if it has just 1 child
-			-- smh how many ways do you need just to specify a type ...
-			-- TODO i thik here i should just recursively call
-			if fieldnode.child then
-				assert(#fieldnode.child == 1)
-				-- then try to read a single type from the ... smh
-				-- this xml doesn't distinguish between single-field structs and fields themselves
-				return VecType(makeTypeNode(fieldnode.child[1], nil, typesUsed))
-			end
-			-- TODO seems if no template is provided for std::vector then they just use void*
-			return PtrType(Type'void')
+			return STLVectorType(templateType)
 		elseif fieldtag == 'pointer' then
 			-- why have attrs 'name' and 'type-name' at the same time?
 			local ptrBaseTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
@@ -426,14 +471,14 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 							typesUsed
 						)
 						if string.trim(structStr) ~= '' then
-							out:insert(structStr)
+							structDefs:insert(structStr)
 						end
 					else
 						assert(#fieldnode.child == 1)
 						local code
 						ptrBaseType, code = makeTypeNode(fieldnode.child[1], structName, typesUsed)
 						if string.trim(code) ~= '' then
-							out:insert(code)
+							structDefs:insert(code)
 						end
 						assert(Type:isa(ptrBaseType))
 					end
@@ -476,7 +521,7 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 		elseif fieldtag == 'stl-string' then
 			return Type'stl-string'	-- gets translated in :getLuaName()
 		else
-			return Type(fieldtag)	-- prim
+			return Type(tagToType(fieldtag))	-- prim
 		end
 	end, function(err)
 		return 'for base name '..tostring(baseFieldName)..'\n'
@@ -486,7 +531,11 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 	end))
 	if not result then error(fieldType) end
 	assert(Type:isa(fieldType))
-	return fieldType, out:concat'\n'
+	return fieldType,
+		table{
+			structDefs:concat'\n',
+			out:concat'\n'
+		}:concat'\n'
 end
 
 function makeStructNode(structNode, structName, typesUsed)
@@ -712,14 +761,18 @@ for f in (dfhacksrcdir/'xml'):dir() do
 						-- TODO here read the type just like you would for any other struct-field
 						local typename = htmlcommon.findattr(ch, 'type-name')
 						if typename then
-							globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(Type(typename)):declare().."', "..('0x%x'):format(var.addr)..")")
+							local globalType = Type(typename)
+							globalType:addTypeUsed(globalTypesUsed)
+							globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
 						else
 							-- how is pointer-type different than type-name for global-object?
 							-- both are the type of the memory at the location?
 							-- shouldn't either all be
 							local ptrtype = htmlcommon.findattr(ch, 'pointer-type')
 							if ptrtype then
-								globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(PtrType(Type(ptrtype))):declare().."', "..('0x%x'):format(var.addr)..")")
+								local globalType = PtrType(Type(ptrtype))
+								globalType:addTypeUsed(globalType)
+								globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
 							else
 								-- if we have more than 1 child then create a struct
 								-- and in that case, struct name = global name ... hmmmm
@@ -727,25 +780,28 @@ for f in (dfhacksrcdir/'xml'):dir() do
 									error("got a global with no children and no type-name and no pointer-type")
 								elseif #ch.child == 1 then
 									-- read as a type
-									local typeNode, code = makeTypeNode(
+									local globalType, code = makeTypeNode(
 										ch.child[1],
 										nil,
 										globalTypesUsed
 									)
+									assert(Type:isa(globalType))
+									globalType:addTypeUsed(globalType)
 									assert(string.trim(code) == '')
-									globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(typeNode):declare().."', "..('0x%x'):format(var.addr)..")")
+									globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
 								else
 									-- read as a struct
-									local typeNode, code = makeStructNode(
+									local globalType, code = makeStructNode(
 										ch,
 										makeTypeName(name),
 										globalTypesUsed
 									)
-									assert(Type:isa(typeNode))
+									assert(Type:isa(globalType))
+									globalType:addTypeUsed(globalType)
 									if string.trim(code) ~= '' then
 										globalStructDefs:insert(code)
 									end
-									globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(typeNode):declare().."', "..('0x%x'):format(var.addr)..")")
+									globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
 								end
 							end
 						end
