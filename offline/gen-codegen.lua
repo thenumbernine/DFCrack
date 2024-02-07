@@ -95,6 +95,7 @@ end
 
 -- primitive type names - don't require, don't transform
 local primitiveTypeNames = {
+	void = true,
 	bool = true,
 	char = true,
 	['unsigned char'] = true,
@@ -111,12 +112,17 @@ local primitiveTypeNames = {
 	int = true,
 	['unsigned int'] = true,
 	['signed int'] = true,
+	long = true,	-- long is ... int64?
 	float = true,
 	double = true,
+	
+	['s-float'] = 'float',	-- not sure where I should be doing this translation.  the lhs is an xml tag, the rhs is the C type.
 	['stl-string'] = 'std_string',
+	['df-flagarray'] = 'df_flagarray',
 }
 -- reserved = do require, don't transform
 local reservedTypeNames = table(primitiveTypeNames, {
+	'vector_bool',
 	'vector_string',
 	'vector_int',
 }):setmetatable(nil)
@@ -268,6 +274,16 @@ function AnonStructType:getBase() return self end
 function AnonStructType:makeLuaName() return '' end	-- assume the caller does stuff right
 function AnonStructType:addTypeUsed(typesUsed) end
 
+
+local function buildTypesUsed(typesUsed)
+	return table.keys(typesUsed):sort():mapi(function(t)
+		local w = t:match'[%a_][%a%d_]*'
+		if not w then error("got a bad type "..t) end
+		return "require 'df."..w.."'"
+	end):concat'\n'
+end
+
+
 local function makeEnumType(ch)
 	local out = table()
 	-- TODO doesn't have type-name for some nested enum inline type declarations ...
@@ -307,13 +323,6 @@ local makeStructNode
 local baseFieldName
 local makeTypeNode
 
-local tagToTypeTable = {
-	['s-float'] = 'float',
-}
-local function tagToType(tag)
-	return tagToTypeTable[tag] or tag
-end
-
 --[[
 I think the intended interpretation is, for a particular global-type/field-type/templated-type is ...
 1) look at attr type-name
@@ -323,7 +332,6 @@ I think the intended interpretation is, for a particular global-type/field-type/
 --]]
 local function getTypeFromAttrOrChildren(node, structName, typesUsed)
 	local typeName = htmlcommon.findattr(node, 'type-name')
-	typeName = tagToType(typeName)
 	if typeName then return Type(typeName) end
 	
 	local pointerType = htmlcommon.findattr(node, 'pointer-type')
@@ -431,10 +439,17 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 				structDefs:insert(code)
 			end
 			return STLVectorType(templateType)
+		elseif fieldtag == 'df-flagarray' then
+			local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
+			return Type'df-flagarray'
 		elseif fieldtag == 'pointer' then
 			local ptrBaseType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
 			-- pointer has default base type of void, i.e. the pointer has a default type of void*
 			ptrBaseType = ptrBaseType or Type'void'
+			
+			if code and string.trim(code) ~= '' then
+				structDefs:insert(code)
+			end
 
 			--[[ not sure what this does at all
 			local isArray = htmlcommon.findattr(fieldnode, 'is-array') == 'true'
@@ -468,7 +483,7 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 		elseif fieldtag == 'stl-string' then
 			return Type'stl-string'
 		else
-			return Type(tagToType(fieldtag))	-- prim
+			return Type(fieldtag)	-- prim
 		end
 	end, function(err)
 		return 'for base name '..tostring(baseFieldName)..'\n'
@@ -563,14 +578,6 @@ function makeStructNode(structNode, structName, typesUsed)
 		structType = AnonStructType()
 	end
 	return structType, out:concat'\n'
-end
-
-local function buildTypesUsed(typesUsed)
-	return table.keys(typesUsed):sort():mapi(function(t)
-		local w = t:match'[%a_][%a%d_]*'
-		if not w then error("got a bad type "..t) end
-		return "require 'df."..w.."'"
-	end):concat'\n'
 end
 
 

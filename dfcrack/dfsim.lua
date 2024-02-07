@@ -9,6 +9,16 @@ require 'ffi.req' 'c.pthread'
 local pthread = ffi.C
 --]]
 
+-- [[ TODO this as require()'s in the generated code
+local ffi = require 'ffi'
+ffi.cdef[[
+typedef struct df_flagarray {
+	uint8_t * bits;
+	size_t size;
+} df_flagarray;
+]]
+--]]
+
 --[[ here's the by-hand port of the headers to luajit ...
 local df = require 'mem'
 --]]
