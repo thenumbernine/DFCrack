@@ -299,7 +299,14 @@ function Emitter:init(args)
 	assert(not self.outpath:exists(), "file "..self.outpath.." already exists!")
 	
 	self.out = table()
+	
+	-- collection of xml->lua types in other files that will need to be required
 	self.typesUsed = {}
+
+	-- collection of lua declarations. for inline structs and their templated-vector-generations to be inserted into
+	-- collections of strings to be turned into ffi.cdef's
+	-- used by StructEmitter and global Emitter
+	self.structDefs = table()
 end
 
 function Emitter:write()
@@ -320,9 +327,7 @@ I think the intended interpretation is, for a particular global-type/field-type/
 --]]
 function Emitter:getTypeFromAttrOrChildren(
 	node,
-	namespace,
-	typesUsed,
-	structDefs
+	namespace
 )
 	-- this is always passed a value or variable
 	-- but sometimes from 
@@ -343,9 +348,7 @@ function Emitter:getTypeFromAttrOrChildren(
 			assert(ch.type == 'tag')
 			return self:makeTypeNode(
 				ch, 
-				namespace,
-				typesUsed,
-				structDefs
+				namespace
 			)
 		end
 
@@ -353,9 +356,7 @@ function Emitter:getTypeFromAttrOrChildren(
 		return self:makeStructNode(
 			node,
 			namespace:concat'_'..makeTypeName(baseFieldName or ''),	-- struct name
-			namespace,
-			typesUsed,
-			structDefs
+			namespace
 		)
 	end
 
@@ -366,11 +367,8 @@ end
 -- hmm try to use getTypeFromAttrOrChildren more and self:makeTypeNode less
 function Emitter:makeTypeNode(
 	fieldnode,
-	namespace,
-	typesUsed,
-	structDefs
+	namespace
 )
-	assert(typesUsed)
 	local fieldtag = fieldnode.tag
 
 	-- out for this type node
@@ -403,9 +401,7 @@ function Emitter:makeTypeNode(
 
 			local baseType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
-				namespace,
-				typesUsed,
-				structDefs
+				namespace
 			)
 			assert(baseType)
 			if code and string.trim(code) ~= '' then
@@ -423,9 +419,7 @@ function Emitter:makeTypeNode(
 				structType, fieldTypeStr = self:makeStructNode(
 					fieldnode,
 					nil, -- no name = no trailing ;, anonymous inline struct
-					namespace,
-					typesUsed,
-					structDefs
+					namespace
 				)
 				-- insert the anonymous nested struct
 				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
@@ -442,9 +436,7 @@ function Emitter:makeTypeNode(
 			-- uhhh ... same as stl-vector, sometimes no type-name nor pointer-type nor single-child-node are used, and an inline struct is implied
 			local templateType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
-				namespace,
-				typesUsed,
-				structDefs
+				namespace
 			)
 			assert(templateType)
 			if code and string.trim(code) ~= '' then
@@ -454,9 +446,7 @@ function Emitter:makeTypeNode(
 		elseif fieldtag == 'stl-vector' then
 			local templateType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
-				namespace,
-				typesUsed,
-				structDefs
+				namespace
 			)
 			-- stl-vector has default template-type of void*
 			templateType = templateType or PtrType(Type'void')
@@ -470,9 +460,7 @@ function Emitter:makeTypeNode(
 		elseif fieldtag == 'pointer' then
 			local ptrBaseType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
-				namespace,
-				typesUsed,
-				structDefs
+				namespace
 			)
 			-- pointer has default base type of void, i.e. the pointer has a default type of void*
 			ptrBaseType = ptrBaseType or Type'void'
@@ -536,12 +524,8 @@ typesUsed = used for recording require()'s
 function Emitter:makeStructNode(
 	structNode,
 	structName,
-	namespace,
-	typesUsed,
-	structDefs
+	namespace
 )
-	assert(typesUsed)
-
 	local out = table()
 
 	local result, structType = xpcall(function()
@@ -589,9 +573,7 @@ function Emitter:makeStructNode(
 							-- or maybe I can't since too often the element is specifying the type in the tag name ...
 							local fieldType, code = self:makeTypeNode(
 								fieldnode,
-								fieldNamespace,
-								typesUsed,
-								structDefs
+								fieldNamespace
 							)
 
 							assert(Type:isa(fieldType))
@@ -608,13 +590,13 @@ function Emitter:makeStructNode(
 								if AnonStructType:isa(fieldType) then
 									out:insert(code)
 								else
-									structDefs:insert(code)
+									self.structDefs:insert(code)
 								end
 							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
 
 							-- TODO find which file has which type
-							fieldType:addTypeUsed(typesUsed)
+							fieldType:addTypeUsed(self.typesUsed)
 						end
 					end
 				end
@@ -701,23 +683,18 @@ function StructEmitter:process(ch)
 	local out = self.out
 
 	out:insert"local ffi = require 'ffi'"
-
-	-- collections of strings to be turned into ffi.cdef's
-	local structDefs = table()
 	
 	local structType, code = self:makeStructNode(
 		ch,					-- xml node
 		self.structName,			-- struct name to insert into the struct code
-		table{self.structName},	-- namespace
-		self.typesUsed,			-- collection of xml->lua types in other files that will need to be required
-		structDefs			-- collection of lua declarations. for inline structs and their templated-vector-generations to be inserted into
+		table{self.structName}	-- namespace
 	)
 	if string.trim(code) ~= '' then
 		-- need to also keep track of the code's typename
 		-- this way subsequent typedefs don't have colliding typenames (like we find in enabler)
-		structDefs:insert(code)
+		self.structDefs:insert(code)
 	end
-	for _,code in ipairs(structDefs) do
+	for _,code in ipairs(self.structDefs) do
 		out:insert'ffi.cdef[['
 		out:insert(code)
 		out:insert']]'
@@ -775,16 +752,99 @@ function BitfieldEmitter:process(ch)
 	out:insert"]]"
 end
 
+local GlobalEmitter = Emitter:subclass()
+
+function GlobalEmitter:init(args)
+	GlobalEmitter.super.init(self, args)
+	self.structCode = table()
+	self.objDefs = table()
+end
+
+function GlobalEmitter:process(ch)
+	-- accumulate these
+
+	-- TODO duplicate for struct and class below?
+	local name = htmlcommon.findattr(ch, 'name')
+	local since = htmlcommon.findattr(ch, 'since')
+	if since then
+		error("haven't got this handled yet") -- cuz no one is using it yet ...
+	end
+
+	assert(xpcall(function()
+
+		-- I would dereference [0] each of these
+		-- and for fixed-size arrays that'd be great, complete with array bounds
+		-- for structs / non-prim-pointers I think that would give a ref to the memory (i think? how does luajit do it?)
+		-- (seems luajit has ref &'s in its ctypes / printing info, but doesn't allow them in its casting / for ppl using its API ... i think?)
+		-- but for prims, casting to prim ptr and then [0]'ing will give you back the prim data, if not Lua data, rather than a ref
+		-- so until then, keep in pointers (and for static-sized arrays, pointer-to-pointers)
+
+		local var = vars[name]
+		if not var then
+			self.objDefs:insert('-- global '..snakeToCamelCase(name)..' has no address...')
+		else
+			-- TODO here read the type just like you would for any other struct-field
+			local globalStructDefs = table()
+			local globalType, code = self:getTypeFromAttrOrChildren(
+				ch,
+				table{'Global'},
+				globalTypesUsed,
+				globalStructDefs
+			)
+			assert(globalType)
+			assert(Type:isa(globalType))
+			globalType:addTypeUsed(self.typesUsed)
+			if code and string.trim(code) ~= '' then
+				globalStructDefs:insert(code)
+			end
+			for _,code in ipairs(globalStructDefs) do
+				self.structCode:insert(code)
+			end
+			self.objDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
+		end
+	end, function(err)
+		return 'for global '..name..'\n'
+			..err..'\n'
+			..debug.traceback()
+	end))
+end
+
+function GlobalEmitter:write()
+	
+	-- construct .out from .structCode and .objDefs
+	-- maybe every emitter doesn't need .out?
+	self.out = table()
+	:append{ (function()
+		local s = string.trim(buildTypesUsed(self.typesUsed))
+		return s ~= '' and s or nil
+	end)() }
+	:append( (function()
+		if #self.structCode == 0 then return nil end
+		return table{
+			"local ffi = require 'ffi'",
+			"ffi.cdef[[",
+		}:append(self.structCode):append{
+			"]]",
+		}
+	end)() )
+	:append{
+		"local df = {}",
+	}
+	:append(self.objDefs)
+	:append{
+		"return df",
+	}
+
+	GlobalEmitter.super.write(self)
+end
+
 
 local destdir = path'dfcrack/df'
 destdir:mkdir()
 
-local globalStructCode = table()
-local globalObjDefs = table()
-local globalEmitter = Emitter{
+local globalEmitter = GlobalEmitter{
 	outpath = (destdir/('globals.lua')),
 }
-local globalTypesUsed = globalEmitter.typesUsed
 
 for f in (dfhacksrcdir/'xml'):dir() do
 	io.stderr:write('processing ', f.path, '\n')
@@ -838,53 +898,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 
 			elseif ch.tag == 'global-object' then
-				
-				-- accumulate these
-
-				-- TODO duplicate for struct and class below?
-				local name = htmlcommon.findattr(ch, 'name')
-				local since = htmlcommon.findattr(ch, 'since')
-				if since then
-					error("haven't got this handled yet") -- cuz no one is using it yet ...
-				end
-
-				assert(xpcall(function()
-
-					-- I would dereference [0] each of these
-					-- and for fixed-size arrays that'd be great, complete with array bounds
-					-- for structs / non-prim-pointers I think that would give a ref to the memory (i think? how does luajit do it?)
-					-- (seems luajit has ref &'s in its ctypes / printing info, but doesn't allow them in its casting / for ppl using its API ... i think?)
-					-- but for prims, casting to prim ptr and then [0]'ing will give you back the prim data, if not Lua data, rather than a ref
-					-- so until then, keep in pointers (and for static-sized arrays, pointer-to-pointers)
-
-					local var = vars[name]
-					if not var then
-						globalObjDefs:insert('-- global '..snakeToCamelCase(name)..' has no address...')
-					else
-						-- TODO here read the type just like you would for any other struct-field
-						local globalStructDefs = table()
-						local globalType, code = globalEmitter:getTypeFromAttrOrChildren(
-							ch,
-							table{'Global'},
-							globalTypesUsed,
-							globalStructDefs
-						)
-						assert(globalType)
-						assert(Type:isa(globalType))
-						globalType:addTypeUsed(globalTypesUsed)
-						if code and string.trim(code) ~= '' then
-							globalStructDefs:insert(code)
-						end
-						for _,code in ipairs(globalStructDefs) do
-							globalStructCode:insert(code)
-						end
-						globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
-					end
-				end, function(err)
-					return 'for global '..name..'\n'
-						..err..'\n'
-						..debug.traceback()
-				end))
+				globalEmitter:process(ch)
 			else
 				error("unknown node: "..require 'ext.tolua'{
 					f = tostring(f),
@@ -906,26 +920,5 @@ for f in (dfhacksrcdir/'xml'):dir() do
 	end
 end
 
-globalEmitter.out = table()
-	:append{ (function()
-		local s = string.trim(buildTypesUsed(globalTypesUsed))
-		return s ~= '' and s or nil
-	end)() }
-	:append( (function()
-		if #globalStructCode == 0 then return nil end
-		return table{
-			"local ffi = require 'ffi'",
-			"ffi.cdef[[",
-		}:append(globalStructCode):append{
-			"]]",
-		}
-	end)() )
-	:append{
-		"local df = {}",
-	}
-	:append(globalObjDefs)
-	:append{
-		"return df",
-	}
-	
+
 globalEmitter:write()
