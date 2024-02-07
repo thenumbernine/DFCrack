@@ -21,7 +21,7 @@ local ffi = require 'ffi'
 local osarch = ffi.os..'_'..ffi.arch	-- one dereference instead of two
 local dfhack_osarch = assert(({
 	Windows_x86 = 'SDL win32',	-- v0.47.05 SDL win32
-	Windows_x64 = 'SDL win64',		
+	Windows_x64 = 'SDL win64',
 	Linux_x86 = 'linux32',
 	Linux_x64 = 'linux64',	-- v0.47.05 linux64
 	OSX_x86 = 'osx32',
@@ -168,10 +168,10 @@ local class = require 'ext.class'
 
 local Type = class()
 function Type:init(name) self.name = assert(name) end
-function Type:makeLuaName() 
-	local res = reservedTypeNames[self.name] 
+function Type:makeLuaName()
+	local res = reservedTypeNames[self.name]
 	if res == true then res = self.name end
-	if res then return res end 
+	if res then return res end
 	return makeTypeName(self.name)
 end
 function Type:getBase() return self end
@@ -188,39 +188,6 @@ function Type:addTypeUsed(typesUsed)
 		typesUsed[makeTypeName(baseType)] = true
 	end
 end
-
-local PtrType = Type:subclass()
-function PtrType:init(base) 
-	assert(Type:isa(base))
-	self.base = assert(base) 
-end
-function PtrType:getBase()
-	return self.base:getBase()
-end
---[[
-function PtrType:declare(var)
-	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
-	if ArrayType:isa(self.base) then
-		return self.base.base:makeLuaName()..' (*'..(var or '')..')'..self.base.count
-	end
-	-- base (*field)[count]
-	-- and if you do that ... you also need the field name
-	return PtrType.super.declare(self, var)
-end
---]]
-function PtrType:makeLuaName()
---[[	
-	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
-	if ArrayType:isa(self.base) then
-		return self.base.base:makeLuaName()..' (*)'..self.base.count
-	end
---]]	
-	-- base (*field)[count]
-	-- and if you do that ... you also need the field name
-	return self.base:makeLuaName()..' *'
-end
-
-
 
 local ArrayType = Type:subclass()
 function ArrayType:init(base, count)
@@ -239,10 +206,42 @@ function ArrayType:declare(var)
 	return self.base:declare(var)..'['..self.count..']'
 end
 
+local PtrType = Type:subclass()
+function PtrType:init(base)
+	assert(Type:isa(base))
+	self.base = assert(base)
+end
+function PtrType:getBase()
+	return self.base:getBase()
+end
+-- [[
+function PtrType:declare(var)
+	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
+	if ArrayType:isa(self.base) then
+		return self.base.base:declare''
+			..' (*'..(var or '')..')['..self.base.count..']'
+	end
+	-- base (*field)[count]
+	-- and if you do that ... you also need the field name
+	return PtrType.super.declare(self, var)
+end
+--]]
+function PtrType:makeLuaName()
+--[[
+	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
+	if ArrayType:isa(self.base) then
+		return self.base.base:makeLuaName()..' (*)'..self.base.count
+	end
+--]]
+	-- base (*field)[count]
+	-- and if you do that ... you also need the field name
+	return self.base:makeLuaName()..' *'
+end
+
 local VecType = Type:subclass()
-function VecType:init(T) 
+function VecType:init(T)
 	assert(Type:isa(T))
-	self.T = assert(T) 
+	self.T = assert(T)
 end
 function VecType:getBase() return self.T:getBase() end
 function VecType:makeLuaName()
@@ -269,7 +268,7 @@ local function makeEnumType(ch)
 	local lastEnumValue = -1
 	for _,fieldnode in ipairs(ch.child) do
 		if fieldnode.type == 'tag' and fieldnode.tag == 'enum-item' then
-			local enumName = htmlcommon.findattr(fieldnode, 'name') 
+			local enumName = htmlcommon.findattr(fieldnode, 'name')
 			if enumName then
 				enumName = snakeToCamelCase(enumName)
 			else
@@ -297,7 +296,7 @@ local baseFieldName
 local function makeTypeNode(fieldnode, structName, typesUsed)
 	assert(typesUsed)
 	local fieldtag = fieldnode.tag
-	
+
 	local out = table()
 
 	-- try to get the type
@@ -309,7 +308,7 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 			assert(arrayCount, "got a static-string without a size")
 			return ArrayType(Type'char', arrayCount)
 		elseif fieldtag == 'static-array' then
-			
+
 			-- here, parse the children as if they were a type of their own
 			-- then append the arrayCount to what you get
 
@@ -337,9 +336,9 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 			if ptrTypeStr then
 				return ArrayType(PtrType(Type(ptrTypeStr)), arrayCount)
 			end
-			if not fieldnode.child 
+			if not fieldnode.child
 			or not fieldnode.child[1]
-			then 
+			then
 				error"failed to find children of static-array"
 			end
 			local fieldType, code = makeTypeNode(fieldnode.child[1], structName, typesUsed)
@@ -348,17 +347,17 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 			end
 
 			return ArrayType(fieldType, arrayCount)
-			
+
 		elseif fieldtag == 'compound' then
 			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
 			if fieldTypeStr then
 				assert(not fieldnode.child, "found a compound with a type-name and with children ...")
 			else
-				assert(fieldnode.child, "found a compound without a type and without children...") 
-				
+				assert(fieldnode.child, "found a compound without a type and without children...")
+
 				structType, fieldTypeStr = makeStructNode(
-					fieldnode, 
-					--structName..'_'..makeTypeName(baseFieldName or ''), 
+					fieldnode,
+					--structName..'_'..makeTypeName(baseFieldName or ''),
 					nil, -- no trailing ;, no name, anonymous struct
 					typesUsed)
 				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
@@ -442,7 +441,7 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 			--[[
 			if isArray then
 				-- if it' an array then ... it's a double pointer?
-				-- .. *and* it's also defining a struct?  
+				-- .. *and* it's also defining a struct?
 				-- what?
 				fieldType = fieldType .. ' *'
 			end
@@ -454,8 +453,8 @@ local function makeTypeNode(fieldnode, structName, typesUsed)
 			-- and insert it before the struct
 			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
 			-- if no type-name, then ... base-type ... ?
-			-- and if base-type exists ... then ... 
-			-- ... use the name of the field of the parent node?  
+			-- and if base-type exists ... then ...
+			-- ... use the name of the field of the parent node?
 			-- which had beter be a static-array?
 			if fieldTypeStr then
 				assert(not fieldnode.child)
@@ -528,16 +527,16 @@ function makeStructNode(structNode, structName, typesUsed)
 						if string.trim(code) ~= '' then
 							out:insert(code)
 						end
-						
-						
+
+
 						assert(Type:isa(fieldType))
 						assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
 						-- and not unlike the globals,
 						-- if no type is specified then we just assume it's an anonymous struct/union
 						--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
-						
+
 						out:insert('\t'..fieldType:declare(fieldName or '')..';')
-						
+
 						-- TODO find which file has which type
 						fieldType:addTypeUsed(typesUsed)
 					end
@@ -566,7 +565,7 @@ end
 
 local function buildTypesUsed(typesUsed)
 	return table.keys(typesUsed):sort():mapi(function(t)
-		local w = t:match'[%a_][%a%d_]*' 
+		local w = t:match'[%a_][%a%d_]*'
 		if not w then error("got a bad type "..t) end
 		return "require 'df."..w.."'"
 	end):concat'\n'
@@ -580,14 +579,14 @@ local globalTypesUsed = {}
 local destdir = path'dfcrack/df'
 destdir:mkdir()
 for f in (dfhacksrcdir/'xml'):dir() do
-	io.stderr:write('processing ', f.path, '\n') 
+	io.stderr:write('processing ', f.path, '\n')
 	local res, err = xpcall(function()
 		local basefilename = f.path:match'^df%.(.*)%.xml$'
-		if not basefilename then 
-			print("skipping file "..tostring(f)) 
+		if not basefilename then
+			print("skipping file "..tostring(f))
 			return
 		end
-		
+
 		-- TODO apply xslt ... or not.
 		local dfheaderxml= htmlparser.parse(assert((dfhacksrcdir/'xml'/f):read()))
 		preprocess(dfheaderxml)
@@ -599,15 +598,15 @@ for f in (dfhacksrcdir/'xml'):dir() do
 				enumTypeName = makeTypeName(enumTypeName)
 				local outpath = (destdir/(enumTypeName..'.lua'))
 				assert(not outpath:exists(), "file "..outpath.." already exists!")
-				
+
 				local out = table()
 				out:insert"local ffi = require 'ffi'"
 				out:insert'ffi.cdef[['
 				out:insert(makeEnumType(ch))
 				out:insert']]'
 				outpath:write(out:concat'\n'..'\n')
-						
-			elseif ch.tag == 'class-type' 
+
+			elseif ch.tag == 'class-type'
 			or ch.tag == 'struct-type'
 			then
 				local typename = htmlcommon.findattr(ch, 'type-name')
@@ -616,7 +615,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 				local outpath = (destdir/(structName..'.lua'))
 				assert(not outpath:exists(), "file "..outpath.." already exists!")
-	
+
 				local out = table()
 				local typesUsed = {}
 
@@ -628,8 +627,8 @@ for f in (dfhacksrcdir/'xml'):dir() do
 				end
 				out:insert']]'
 
-				out:insert(1, buildTypesUsed(typesUsed))				
-				
+				out:insert(1, buildTypesUsed(typesUsed))
+
 				outpath:write(out:concat'\n'..'\n')
 
 			elseif ch.tag == 'bitfield-type' then
@@ -678,15 +677,22 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 			elseif ch.tag == 'df-linked-list-type' then
 			elseif ch.tag == 'df-other-vectors-type' then
-			
+
 
 			elseif ch.tag == 'global-object' then
 				-- accumulate these
 
 				-- TODO duplicate for struct and class below?
 				local name = htmlcommon.findattr(ch, 'name')
-				
+
 				assert(xpcall(function()
+
+					-- I would dereference [0] each of these
+					-- and for fixed-size arrays that'd be great, complete with array bounds
+					-- for structs / non-prim-pointers I think that would give a ref to the memory (i think? how does luajit do it?)
+					-- (seems luajit has ref &'s in its ctypes / printing info, but doesn't allow them in its casting / for ppl using its API ... i think?)
+					-- but for prims, casting to prim ptr and then [0]'ing will give you back the prim data, if not Lua data, rather than a ref
+					-- so until then, keep in pointers (and for static-sized arrays, pointer-to-pointers)
 
 					local var = vars[name]
 					if not var then
@@ -699,7 +705,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 						else
 							-- how is pointer-type different than type-name for global-object?
 							-- both are the type of the memory at the location?
-							-- shouldn't either all be 
+							-- shouldn't either all be
 							local ptrtype = htmlcommon.findattr(ch, 'pointer-type')
 							if ptrtype then
 								globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(PtrType(Type(ptrtype))):declare().."', "..('0x%x'):format(var.addr)..")")
@@ -748,14 +754,14 @@ for f in (dfhacksrcdir/'xml'):dir() do
 		end
 
 	end, function(err)
-		return 
+		return
 			'for file '..f..'\n'
 			..err..'\n'
 			..debug.traceback()
 	end)
-	if not res then 
-		io.stderr:write(err) 
-		break 
+	if not res then
+		io.stderr:write(err)
+		break
 	end
 end
 
@@ -763,10 +769,10 @@ local globalOutPath = (destdir/('globals.lua'))
 assert(not globalOutPath:exists(), "file "..globalOutPath.." already exists!")
 globalOutPath:write(
 	table()
-	:append( (function()
+	:append{ (function()
 		local s = string.trim(buildTypesUsed(globalTypesUsed))
 		return s ~= '' and s or nil
-	end)() )
+	end)() }
 	:append( (function()
 		if #globalStructDefs == 0 then return nil end
 		return table{
@@ -776,6 +782,12 @@ globalOutPath:write(
 			"]]",
 		}
 	end)() )
+	:append{
+		"local df = {}",
+	}
 	:append(globalObjDefs)
+	:append{
+		"return df",
+	}
 	:concat'\n'..'\n'
 )
