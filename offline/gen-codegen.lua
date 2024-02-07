@@ -350,7 +350,7 @@ local function getTypeFromAttrOrChildren(node, namespace, typesUsed)
 			assert(ch.type == 'tag')
 			return makeTypeNode(
 				ch, 
-				namespace:append{makeTypeName(baseFieldName or '')},
+				namespace,
 				typesUsed
 			)
 		end
@@ -365,7 +365,7 @@ local function getTypeFromAttrOrChildren(node, namespace, typesUsed)
 	end
 
 	-- no type
-	return nil, nil
+	return nil, ''
 end
 
 -- hmm try to use getTypeFromAttrOrChildren more and makeTypeNode less
@@ -373,7 +373,7 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 	assert(typesUsed)
 	local fieldtag = fieldnode.tag
 
-	local structDefs = table()
+	-- out for this type node
 	local out = table()
 
 	-- try to get the type
@@ -404,7 +404,7 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 			local baseType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
 			assert(baseType)
 			if code and string.trim(code) ~= '' then
-				structDefs:insert(code)
+				out:insert(code)
 			end
 			return ArrayType(baseType, arrayCount)
 
@@ -420,6 +420,7 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 					nil, -- no trailing ;, no name, anonymous struct
 					namespace,
 					typesUsed)
+				-- insert the anonymous nested struct
 				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
 				return structType
 			end
@@ -435,7 +436,7 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 			local templateType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
 			assert(templateType)
 			if code and string.trim(code) ~= '' then
-				structDefs:insert(code)
+				out:insert(code)
 			end
 			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
@@ -443,7 +444,7 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 			-- stl-vector has default template-type of void*
 			templateType = templateType or PtrType(Type'void')
 			if code and string.trim(code) ~= '' then
-				structDefs:insert(code)
+				out:insert(code)
 			end
 			return STLVectorType(templateType)
 		elseif fieldtag == 'df-flagarray' then
@@ -455,7 +456,7 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 			ptrBaseType = ptrBaseType or Type'void'
 			
 			if code and string.trim(code) ~= '' then
-				structDefs:insert(code)
+				out:insert(code)
 			end
 
 			--[[ not sure what this does at all
@@ -500,11 +501,7 @@ function makeTypeNode(fieldnode, namespace, typesUsed)
 	end))
 	if not result then error(fieldType) end
 	assert(Type:isa(fieldType))
-	return fieldType,
-		table{
-			structDefs:concat'\n',
-			out:concat'\n'
-		}:concat'\n'
+	return fieldType, out:concat'\n'
 end
 
 --[[
@@ -552,12 +549,18 @@ function makeStructNode(structNode, structName, namespace, typesUsed)
 						else
 							-- might be nil , should only be nil for anonymous struct/union's
 							local fieldName = htmlcommon.findattr(fieldnode, 'name')
-							-- capture the first name.  what to do if it's nil?
-							baseFieldName = fieldName
+							
+							-- capture the first name.
+							-- what to do if it's nil?
+							-- it is nil for anonymous nested structs ...
+							baseFieldName = fieldName or baseFieldName
+
+							-- since most inline structs are named by their fields ...
+							local fieldNamespace = table(namespace) --:append{fieldName and makeTypeName(fieldName)}
 
 							-- TODO can I safely call getTypeFromAttrOrChildren here?
 							-- or maybe I can't since too often the element is specifying the type in the tag name ...
-							local fieldType, code = makeTypeNode(fieldnode, table{structName}, typesUsed)
+							local fieldType, code = makeTypeNode(fieldnode, fieldNamespace, typesUsed)
 
 							assert(Type:isa(fieldType))
 							assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
@@ -566,8 +569,14 @@ function makeStructNode(structNode, structName, namespace, typesUsed)
 							--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
 
 							if string.trim(code) ~= '' then
-								out:insert(code)
-							end							
+								if AnonStructType:isa(fieldType) then
+									out:insert(code)
+								else
+									-- TODO we don't just want one contiguous code for a single ffi.cdef
+									-- we want multiple ffi.cdef's with calls for building vectors, deques, etc in between
+									structDefs:insert(code)
+								end
+							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
 
 							-- TODO find which file has which type
@@ -598,10 +607,12 @@ function makeStructNode(structNode, structName, namespace, typesUsed)
 		--error("what to call this struct")
 		structType = AnonStructType()
 	end
-	
+
+	-- TODO the caller needs to ... sometimes ... put this at the top of the other defs
 	return structType,
-		table():append(structDefs, out
-	):concat'\n'
+		(structName and (' /* begin struct def '..structName..' */\n') or '')
+		..table():append(structDefs, out):concat'\n'..'\n'
+		..(structName and (' /* end struct def '..structName..' */\n') or '')
 end
 
 
@@ -647,6 +658,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 				local typeName = htmlcommon.findattr(ch, 'type-name')
 				-- matches global-object with >1 child
 				local structName = makeTypeName(typeName)
+				assert(structName)
 
 				local outpath = (destdir/(structName..'.lua'))
 				assert(not outpath:exists(), "file "..outpath.." already exists!")
@@ -656,7 +668,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 				out:insert"local ffi = require 'ffi'"
 				out:insert'ffi.cdef[['
-				local structType, structStr = makeStructNode(ch, structName, table(), typesUsed)
+				local structType, structStr = makeStructNode(ch, structName, table{structName}, typesUsed)
 				if string.trim(structStr) ~= '' then
 					out:insert(structStr)
 				end
