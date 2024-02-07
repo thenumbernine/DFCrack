@@ -330,7 +330,11 @@ I think the intended interpretation is, for a particular global-type/field-type/
 3) look for a single child element
 4) multiple child elements = implicit struct
 --]]
-local function getTypeFromAttrOrChildren(node, structName, typesUsed)
+local function getTypeFromAttrOrChildren(node, namespace, typesUsed)
+	-- this is always passed a value or variable
+	-- but sometimes from 
+	assert(namespace)
+	
 	local typeName = htmlcommon.findattr(node, 'type-name')
 	if typeName then return Type(typeName) end
 	
@@ -346,14 +350,16 @@ local function getTypeFromAttrOrChildren(node, structName, typesUsed)
 			assert(ch.type == 'tag')
 			return makeTypeNode(
 				ch, 
-				(structName or 'Anon')..'_'..makeTypeName(baseFieldName or ''),
-				typesUsed)
+				namespace:append{makeTypeName(baseFieldName or '')},
+				typesUsed
+			)
 		end
 
 		-- implicit inline struct
 		return makeStructNode(
 			node,
-			(structName or 'Anon')..'_'..makeTypeName(baseFieldName or ''),
+			namespace:concat'_'..makeTypeName(baseFieldName or ''),
+			namespace,
 			typesUsed
 		)
 	end
@@ -362,7 +368,8 @@ local function getTypeFromAttrOrChildren(node, structName, typesUsed)
 	return nil, nil
 end
 
-function makeTypeNode(fieldnode, structName, typesUsed)
+-- hmm try to use getTypeFromAttrOrChildren more and makeTypeNode less
+function makeTypeNode(fieldnode, namespace, typesUsed)
 	assert(typesUsed)
 	local fieldtag = fieldnode.tag
 
@@ -394,7 +401,7 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 				end
 			end
 
-			local baseType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
+			local baseType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
 			assert(baseType)
 			if code and string.trim(code) ~= '' then
 				structDefs:insert(code)
@@ -410,8 +417,8 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 
 				structType, fieldTypeStr = makeStructNode(
 					fieldnode,
-					--structName..'_'..makeTypeName(baseFieldName or ''),
 					nil, -- no trailing ;, no name, anonymous struct
+					namespace,
 					typesUsed)
 				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
 				return structType
@@ -425,14 +432,14 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 			return Type(fieldTypeStr)
 		elseif fieldtag == 'stl-deque' then
 			-- uhhh ... same as stl-vector, sometimes no type-name nor pointer-type nor single-child-node are used, and an inline struct is implied
-			local templateType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
+			local templateType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
 			assert(templateType)
 			if code and string.trim(code) ~= '' then
 				structDefs:insert(code)
 			end
 			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
-			local templateType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
+			local templateType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
 			-- stl-vector has default template-type of void*
 			templateType = templateType or PtrType(Type'void')
 			if code and string.trim(code) ~= '' then
@@ -443,7 +450,7 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 			local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
 			return Type'df-flagarray'
 		elseif fieldtag == 'pointer' then
-			local ptrBaseType, code = getTypeFromAttrOrChildren(fieldnode, structName, typesUsed)
+			local ptrBaseType, code = getTypeFromAttrOrChildren(fieldnode, namespace, typesUsed)
 			-- pointer has default base type of void, i.e. the pointer has a default type of void*
 			ptrBaseType = ptrBaseType or Type'void'
 			
@@ -500,7 +507,14 @@ function makeTypeNode(fieldnode, structName, typesUsed)
 		}:concat'\n'
 end
 
-function makeStructNode(structNode, structName, typesUsed)
+--[[
+structNode = element in xml dom
+structName = passed into this function, since it may or may not exist
+	but it is usually (always?) defined by structNode's 'name' attr
+namespace = namespace
+typesUsed = used for recording require()'s
+--]]
+function makeStructNode(structNode, structName, namespace, typesUsed)
 	assert(typesUsed)
 
 	local structDefs = table()
@@ -541,11 +555,9 @@ function makeStructNode(structNode, structName, typesUsed)
 							-- capture the first name.  what to do if it's nil?
 							baseFieldName = fieldName
 
-							local fieldType, code = makeTypeNode(
-								fieldnode,
-								structName,
-								typesUsed
-							)
+							-- TODO can I safely call getTypeFromAttrOrChildren here?
+							-- or maybe I can't since too often the element is specifying the type in the tag name ...
+							local fieldType, code = makeTypeNode(fieldnode, table{structName}, typesUsed)
 
 							assert(Type:isa(fieldType))
 							assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
@@ -644,7 +656,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 				out:insert"local ffi = require 'ffi'"
 				out:insert'ffi.cdef[['
-				local structType, structStr = makeStructNode(ch, structName, typesUsed)
+				local structType, structStr = makeStructNode(ch, structName, table(), typesUsed)
 				if string.trim(structStr) ~= '' then
 					out:insert(structStr)
 				end
@@ -731,7 +743,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 						globalObjDefs:insert('-- global '..snakeToCamelCase(name)..' has no address...')
 					else
 						-- TODO here read the type just like you would for any other struct-field
-						local globalType, code = getTypeFromAttrOrChildren(ch, 'Global', globalTypesUsed)
+						local globalType, code = getTypeFromAttrOrChildren(ch, table{'Global'}, globalTypesUsed)
 						assert(globalType)
 						assert(Type:isa(globalType))
 						globalType:addTypeUsed(globalTypesUsed)
