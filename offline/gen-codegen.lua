@@ -283,19 +283,19 @@ local function buildTypesUsed(typesUsed)
 	end):concat'\n'
 end
 
-
-local function makeEnumType(ch)
+-- make an enum type, write it to its respective file
+local function makeEnumType(node)
 	local out = table()
 	-- TODO doesn't have type-name for some nested enum inline type declarations ...
 	-- in those cases, pick the name from the struct and field name?
-	local enumTypeName = assert(htmlcommon.findattr(ch, 'type-name'))
+	local enumTypeName = assert(htmlcommon.findattr(node, 'type-name'))
 	enumTypeName = makeTypeName(enumTypeName)
-	local enumBaseType = htmlcommon.findattr(ch, 'base-type') or 'int32_t'
+	local enumBaseType = htmlcommon.findattr(node, 'base-type') or 'int32_t'
 	out:insert('typedef '..enumBaseType..' '..enumTypeName..';')
 	out:insert('enum {')
 	local anonIndex = 1
 	local lastEnumValue = -1
-	for _,fieldnode in ipairs(ch.child) do
+	for _,fieldnode in ipairs(node.child) do
 		if fieldnode.type == 'tag' and fieldnode.tag == 'enum-item' then
 			local enumName = htmlcommon.findattr(fieldnode, 'name')
 			if enumName then
@@ -502,6 +502,8 @@ end
 
 function makeStructNode(structNode, structName, typesUsed)
 	assert(typesUsed)
+
+	local structDefs = table()
 	local out = table()
 
 	local result, structType = xpcall(function()
@@ -539,11 +541,11 @@ function makeStructNode(structNode, structName, typesUsed)
 							-- capture the first name.  what to do if it's nil?
 							baseFieldName = fieldName
 
-							local fieldType, code = makeTypeNode(fieldnode, structName, typesUsed)
-							if string.trim(code) ~= '' then
-								out:insert(code)
-							end
-
+							local fieldType, code = makeTypeNode(
+								fieldnode,
+								structName,
+								typesUsed
+							)
 
 							assert(Type:isa(fieldType))
 							assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
@@ -551,6 +553,9 @@ function makeStructNode(structNode, structName, typesUsed)
 							-- if no type is specified then we just assume it's an anonymous struct/union
 							--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
 
+							if string.trim(code) ~= '' then
+								out:insert(code)
+							end							
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
 
 							-- TODO find which file has which type
@@ -559,6 +564,10 @@ function makeStructNode(structNode, structName, typesUsed)
 					end
 				end
 			end
+			-- ugly hack: leeave the ; off the end if we're going to return this to-be-used for anonymous nested structs with vars
+			-- TODO if no struct name then we want the caller to insert this struct at the top of the file - no inline structs in luajit ... ? i think?
+			-- more specifically, no vectors-of-anon-structs, nor are there in the generated c++ headers
+			-- but we do want nameless inline structs because that is used for struct/union memory alignment more than anything
 			out:insert('} '..(structName and structName..';' or ''))
 		end
 
@@ -577,7 +586,10 @@ function makeStructNode(structNode, structName, typesUsed)
 		--error("what to call this struct")
 		structType = AnonStructType()
 	end
-	return structType, out:concat'\n'
+	
+	return structType,
+		table():append(structDefs, out
+	):concat'\n'
 end
 
 
@@ -597,7 +609,7 @@ for f in (dfhacksrcdir/'xml'):dir() do
 		end
 
 		-- TODO apply xslt ... or not.
-		local dfheaderxml= htmlparser.parse(assert((dfhacksrcdir/'xml'/f):read()))
+		local dfheaderxml = htmlparser.parse(assert((dfhacksrcdir/'xml'/f):read()))
 		preprocess(dfheaderxml)
 		local dataDef = htmlcommon.findtag(dfheaderxml, 'data-definition')
 
@@ -613,7 +625,9 @@ for f in (dfhacksrcdir/'xml'):dir() do
 				out:insert'ffi.cdef[['
 				out:insert(makeEnumType(ch))
 				out:insert']]'
-				outpath:write(out:concat'\n'..'\n')
+				outpath:write((
+					(out:concat'\n'..'\n'):gsub('}%s+;', '};')
+				))
 
 			elseif ch.tag == 'class-type'
 			or ch.tag == 'struct-type'
@@ -638,7 +652,9 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 				out:insert(1, buildTypesUsed(typesUsed))
 
-				outpath:write(out:concat'\n'..'\n')
+				outpath:write((
+					(out:concat'\n'..'\n'):gsub('}%s+;', '};')
+				))
 
 			elseif ch.tag == 'bitfield-type' then
 				local typename = makeTypeName(assert(htmlcommon.findattr(ch, 'type-name')))
@@ -682,7 +698,9 @@ for f in (dfhacksrcdir/'xml'):dir() do
 				out:insert("} "..typename..";")
 				out:insert"]]"
 
-				outpath:write(out:concat'\n'..'\n')
+				outpath:write((
+					(out:concat'\n'..'\n'):gsub('}%s+;', '};')
+				))
 
 			elseif ch.tag == 'df-linked-list-type' then
 			elseif ch.tag == 'df-other-vectors-type' then
