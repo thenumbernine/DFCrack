@@ -140,31 +140,6 @@ local function makeTypeName(name)
 		or snakeToCamelCaseUpper(name)
 end
 
-local function makeVectorType(name)
-	local suffix = ''
-	while name:sub(-1) == '*' do
-		suffix = suffix .. '_ptr'
-		name = string.trim(name:sub(1, -2))
-	end
-
-	if name == 'char' or name == 'int8_t' then
-		name = 'int8'
-	elseif name == 'uint8_t' then
-		name = 'uint8'
-	elseif name == 'short' or name == 'int16_t' then
-		name = 'int16'
-	elseif name == 'uint16_t' then
-		name = 'uint16'
-	elseif name == 'int' or name == 'int32_t' then
-		name = 'int32'
-	elseif name == 'uint32_t' then
-		name = 'uint32'
-	end
-
-	return 'vector_'..name..suffix
-end
-
-
 local function preprocess(tree)
 	for i=#tree,1,-1 do
 		local ch = tree[i]
@@ -207,9 +182,10 @@ function Type:declare(var)
 	return self:makeLuaName()..' '..(var or '')
 end
 function Type:addTypeUsed(typesUsed)
-	local baseType = makeTypeName(self:getBase().name)
+	local baseType = self:getBase().name
+	if not baseType then return end
 	if not reservedTypeNames[baseType] then
-		typesUsed[baseType] = true
+		typesUsed[makeTypeName(baseType)] = true
 	end
 end
 
@@ -218,13 +194,33 @@ function PtrType:init(base)
 	assert(Type:isa(base))
 	self.base = assert(base) 
 end
-function PtrType:getBase() return self.base:getBase() end
+function PtrType:getBase()
+	return self.base:getBase()
+end
+--[[
+function PtrType:declare(var)
+	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
+	if ArrayType:isa(self.base) then
+		return self.base.base:makeLuaName()..' (*'..(var or '')..')'..self.base.count
+	end
+	-- base (*field)[count]
+	-- and if you do that ... you also need the field name
+	return PtrType.super.declare(self, var)
+end
+--]]
 function PtrType:makeLuaName()
-	-- TODO if this is a pointer-to-an-array then you als need to wrap parenthesis
+--[[	
+	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
+	if ArrayType:isa(self.base) then
+		return self.base.base:makeLuaName()..' (*)'..self.base.count
+	end
+--]]	
 	-- base (*field)[count]
 	-- and if you do that ... you also need the field name
 	return self.base:makeLuaName()..' *'
 end
+
+
 
 local ArrayType = Type:subclass()
 function ArrayType:init(base, count)
@@ -249,7 +245,9 @@ function VecType:init(T)
 	self.T = assert(T) 
 end
 function VecType:getBase() return self.T:getBase() end
-function VecType:makeLuaName() return 'vector_'..self.T:makeLuaName():gsub(' %*', '_ptr') end
+function VecType:makeLuaName()
+	return 'vector_'..self.T:makeLuaName():gsub(' %*', '_ptr')
+end
 
 
 local AnonStructType = Type:subclass()
@@ -296,7 +294,8 @@ end
 local makeStructNode
 
 local baseFieldName
-local function getTypeFromNode(fieldnode, structName, typesUsed)
+local function makeTypeNode(fieldnode, structName, typesUsed)
+	assert(typesUsed)
 	local fieldtag = fieldnode.tag
 	
 	local out = table()
@@ -305,7 +304,11 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 	local result, fieldType = assert(xpcall(function()
 
 		-- sometimes the type is in the tag name, some times it is in the type-name attribute ...
-		if fieldtag == 'static-array' then
+		if fieldtag == 'static-string' then
+			local arrayCount = htmlcommon.findattr(fieldnode, 'size')
+			assert(arrayCount, "got a static-string without a size")
+			return ArrayType(Type'char', arrayCount)
+		elseif fieldtag == 'static-array' then
 			
 			-- here, parse the children as if they were a type of their own
 			-- then append the arrayCount to what you get
@@ -339,7 +342,7 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 			then 
 				error"failed to find children of static-array"
 			end
-			local fieldType, code = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
+			local fieldType, code = makeTypeNode(fieldnode.child[1], structName, typesUsed)
 			if string.trim(code) ~= '' then
 				out:insert(code)
 			end
@@ -352,10 +355,8 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 				assert(not fieldnode.child, "found a compound with a type-name and with children ...")
 			else
 				assert(fieldnode.child, "found a compound without a type and without children...") 
-				-- TODO make compound as a struct
-				--fieldType = makeTypeName(baseFieldName)
 				
-				fieldTypeStr, structType = makeStructNode(
+				structType, fieldTypeStr = makeStructNode(
 					fieldnode, 
 					--structName..'_'..makeTypeName(baseFieldName or ''), 
 					nil, -- no trailing ;, no name, anonymous struct
@@ -363,9 +364,7 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 				out:insert('\t'..fieldTypeStr:gsub('\n', '\n\t'))
 				return structType
 			end
-			local resultType = Type(fieldTypeStr)
-			resultType.isAnonStruct = true
-			return resultType
+			return Type(fieldTypeStr)
 		elseif fieldtag == 'bitfield' then
 			-- TODO sometimes this has a type-name attr , and then i guess it points to another def somewhere else .... smh just write it in C++ not XML
 			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
@@ -373,30 +372,33 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 				or 'int32_t'	-- sometimes a bitfield has a name and some flag bits, but not base-type or type-name.  ex: cave_column_rectangle::unk_7
 			return Type(fieldTypeStr)
 		elseif fieldtag == 'stl-vector' then
+			-- TODO Here just call gettypenode on the stl-vector element
+			-- maybe it's the case for all fields/types that ...
+			-- ... 'type-name' means its subtype is the typename provided
+			-- ... 'pointer-type' means the sub-type is a pointer to the typename provided
+			-- ... neither?  a single child means the typename is the tag fo the single-child (how to declare structs of single elements?  right up there with javascript exec()'s implicit-return shortcomings)
+			-- ... multiple children imply a struct.  name on the struct implies struct-name, no-name implies inline struct.
+
 			local vecTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
-			-- TODO here, just handle reading of a single type field
-			if not vecTypeStr then
-				local ptrtype = htmlcommon.findattr(fieldnode, 'pointer-type')
-				if ptrtype then
-					return VecType(PtrType(Type(ptrtype)))
-				end
+			if vecTypeStr then
+				return VecType(Type(vecTypeStr))
 			end
-			if not vecTypeStr then
-				-- see if it has just 1 child
-				-- smh how many ways do you need just to specify a type ...
-				if fieldnode.child
-				and #fieldnode.child == 1 
-				then
-					-- then try to read a single type from the ... smh
-					-- this xml doesn't distinguish between single-field structs and fields themselves
-					vecTypeStr = fieldnode.child[1].tag
-				end
+			-- TODO here, just handle reading of a single type field
+			local ptrtype = htmlcommon.findattr(fieldnode, 'pointer-type')
+			if ptrtype then
+				return VecType(PtrType(Type(ptrtype)))
+			end
+			-- see if it has just 1 child
+			-- smh how many ways do you need just to specify a type ...
+			-- TODO i thik here i should just recursively call
+			if fieldnode.child then
+				assert(#fieldnode.child == 1)
+				-- then try to read a single type from the ... smh
+				-- this xml doesn't distinguish between single-field structs and fields themselves
+				return VecType(makeTypeNode(fieldnode.child[1], nil, typesUsed))
 			end
 			-- TODO seems if no template is provided for std::vector then they just use void*
-			if not vecTypeStr then
-				return PtrType(Type'void')
-			end
-			return VecType(Type(vecTypeStr))
+			return PtrType(Type'void')
 		elseif fieldtag == 'pointer' then
 			-- why have attrs 'name' and 'type-name' at the same time?
 			local ptrBaseTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
@@ -411,12 +413,13 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 				if not fieldnode.child then
 					ptrBaseType = Type'void'
 				else
+					-- implicit compound / anonymous struct
 					if #fieldnode.child > 1 then
 						out:insert'-- ERROR pointer to a structure?'
 						-- here we don't have a ptrBaseType ...
 						-- in fact this is usually the point at which the perl code generates another nested structure
 						local structStr
-						structStr, ptrBaseType = makeStructNode(
+						ptrBaseType, structStr = makeStructNode(
 							fieldnode,
 							(structName or 'Anon')..'_'..makeTypeName(baseFieldName),
 							typesUsed
@@ -427,7 +430,7 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 					else
 						assert(#fieldnode.child == 1)
 						local code
-						ptrBaseType, code = getTypeFromNode(fieldnode.child[1], structName, typesUsed)
+						ptrBaseType, code = makeTypeNode(fieldnode.child[1], structName, typesUsed)
 						if string.trim(code) ~= '' then
 							out:insert(code)
 						end
@@ -486,6 +489,7 @@ local function getTypeFromNode(fieldnode, structName, typesUsed)
 end
 
 function makeStructNode(structNode, structName, typesUsed)
+	assert(typesUsed)
 	local out = table()
 
 	local result, structType = xpcall(function()
@@ -520,7 +524,7 @@ function makeStructNode(structNode, structName, typesUsed)
 						-- capture the first name.  what to do if it's nil?
 						baseFieldName = fieldName
 
-						local fieldType, code = getTypeFromNode(fieldnode, structName, typesUsed)
+						local fieldType, code = makeTypeNode(fieldnode, structName, typesUsed)
 						if string.trim(code) ~= '' then
 							out:insert(code)
 						end
@@ -530,7 +534,7 @@ function makeStructNode(structNode, structName, typesUsed)
 						assert(fieldType, "failed to find a type for field name "..tostring(fieldName))
 						-- and not unlike the globals,
 						-- if no type is specified then we just assume it's an anonymous struct/union
-						assert(fieldName or fieldType.isAnonStruct, "failed to find field name, or we aren't using an anonymous struct, for type "..tostring(fieldType))
+						--assert(fieldName, "failed to find field name for type "..tostring(fieldType))
 						
 						out:insert('\t'..fieldType:declare(fieldName or '')..';')
 						
@@ -557,12 +561,22 @@ function makeStructNode(structNode, structName, typesUsed)
 		--error("what to call this struct")
 		structType = AnonStructType()
 	end
-	return out:concat'\n', structType
+	return structType, out:concat'\n'
+end
+
+local function buildTypesUsed(typesUsed)
+	return table.keys(typesUsed):sort():mapi(function(t)
+		local w = t:match'[%a_][%a%d_]*' 
+		if not w then error("got a bad type "..t) end
+		return "require 'df."..w.."'"
+	end):concat'\n'
 end
 
 
-
+local globalStructDefs = table()
 local globalObjDefs = table()
+local globalTypesUsed = {}
+
 local destdir = path'dfcrack/df'
 destdir:mkdir()
 for f in (dfhacksrcdir/'xml'):dir() do
@@ -608,17 +622,13 @@ for f in (dfhacksrcdir/'xml'):dir() do
 
 				out:insert"local ffi = require 'ffi'"
 				out:insert'ffi.cdef[['
-				local structStr = makeStructNode(ch, structName, typesUsed)
+				local structType, structStr = makeStructNode(ch, structName, typesUsed)
 				if string.trim(structStr) ~= '' then
 					out:insert(structStr)
 				end
 				out:insert']]'
 
-				out = table.keys(typesUsed):sort():mapi(function(t)
-					local w = t:match'[%a_][%a%d_]*' 
-					if not w then error("got a bad type "..t) end
-					return "require 'df."..w.."'"
-				end):append(out)
+				out:insert(1, buildTypesUsed(typesUsed))				
 				
 				outpath:write(out:concat'\n'..'\n')
 
@@ -671,95 +681,63 @@ for f in (dfhacksrcdir/'xml'):dir() do
 			
 
 			elseif ch.tag == 'global-object' then
-				-- accumulate these?
+				-- accumulate these
 
 				-- TODO duplicate for struct and class below?
 				local name = htmlcommon.findattr(ch, 'name')
-				local var = vars[name]
-				if not var then
-					globalObjDefs:insert('-- global '..name..' has no address...')
-				else
-					-- TODO here read the type just like you would for any other struct-field
---[==[
-					local typename = htmlcommon.findattr(ch, 'type-name')
-					if typename then
-						local comment = ({
-							bool = true,
-							int32_t = true,
-						})[typename] and '' or '--'
-						globalObjDefs:insert(comment.."df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
+				
+				assert(xpcall(function()
+
+					local var = vars[name]
+					if not var then
+						globalObjDefs:insert('-- global '..snakeToCamelCase(name)..' has no address...')
 					else
-						-- is a singleton structure
-						-- TODO dont do this? instead use the struct-type?
-						if not ch.child then
-						elseif #ch.child == 1 
-						and ch.child[1].type == 'tag'
-						then
-							local typenode = ch.child[1]
-							if typenode.tag == 'int32_t' then	-- or any other primitive...
-								local typename = typenode.tag
-								globalObjDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
-							elseif typenode.tag == 'enum' then
-								-- only one field.  typedef.  maybe an enum.
-								-- how come the base-type is specified in the variable and not in the type definition?
-								local typename = htmlcommon.findattr(typenode, 'type-name')
-								local basetype = htmlcommon.findattr(typenode, 'base-type')
-								-- in fact for that reason, how about I don't make typedefs of enums ...
-								--print('ffi.cdef[[typedef '..basetype..' df_enum_'..typename..';]]')
-								-- typename will point to the enum info
-								-- basetype is the C type
-								globalObjDefs:insert("df."..name.." = ffi.cast('"..basetype.."*', "..('0x%x'):format(var.addr)..")")
-							elseif typenode.tag == 'static-array' then
-								--[[ same here and stl-vector
-								-- type is either with 0-child in the attr ('type-name' for static-array)
-								-- or as a 1-child
-								local typename = assert(htmlcommon.findattr(typenode, 'type-name'), "static-array expected attr type-name")
-								local count = assert(htmlcommon.findattr(typenode, 'count'), "static-array expected attr count")
-								-- ok like C, luajit ffi doesn't let you just cast to array (or ... whats the syntax?)
-								-- but you can typedef arrays and then cast to that type ... as a pointer
-								-- so that if you do this, your subsequet derferences will need to be [0][index]
-								-- but its not like luajit or C bounds-checks anyways
-								-- so other than wasting typedefs, whats the point here?
-								-- but for record-keeping i just might make those typedefs later ...
-								--globalObjDefs:insert("df."..name.." = ffi.cast('"..typename.."["..count.."]*', "..('0x%x'):format(var.addr)..")")
-								globalObjDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
-								--]]
-								-- [[
-								globalObjDefs:insert("-- df."..name.." = ffi.cast('static-array*', "..('0x%x'):format(var.addr)..")")
-								--]]
-							elseif typenode.tag == 'static-string' then
-								local size = assert(htmlcommon.findattr(typenode, 'size'), "static-string expected attr size")
-								--globalObjDefs:insert("df."..name.." = ffi.cast('char["..size.."]*', "..('0x%x'):format(var.addr)..")")
-								globalObjDefs:insert("df."..name.." = ffi.cast('char*', "..('0x%x'):format(var.addr)..")")
-							elseif typenode.tag == 'stl-vector' then
-								-- ok now we can have 0-children and attr pointer-type
-								-- or we can have 1 child with more info as to what the value refers to
-								globalObjDefs:insert("-- df."..name.." = ffi.cast('vector<TODO>*', "..('0x%x'):format(var.addr)..")")
-							else
-								error('need to handle single-child singleton-type for global '..name)
-							end
+						-- TODO here read the type just like you would for any other struct-field
+						local typename = htmlcommon.findattr(ch, 'type-name')
+						if typename then
+							globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(Type(typename)):declare().."', "..('0x%x'):format(var.addr)..")")
 						else
-							local structName = 'Global_'..makeTypeName(name)
-							structDefs:insert('typedef struct {')
-							for _,fieldnode in ipairs(ch.child) do
-								-- tag name is the c-type, name is the field name
-								if type(fieldnode) == 'table'
-								and fieldnode.type == 'tag'
-								then
-									local fieldName = htmlcommon.findattr(fieldnode, 'name')
-									assert(fieldName, "failed to find field name for singleton type of global "..tostring(name))
-									structDefs:insert('\t'..fieldnode.tag..' '..fieldName..';')
+							-- how is pointer-type different than type-name for global-object?
+							-- both are the type of the memory at the location?
+							-- shouldn't either all be 
+							local ptrtype = htmlcommon.findattr(ch, 'pointer-type')
+							if ptrtype then
+								globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(PtrType(Type(ptrtype))):declare().."', "..('0x%x'):format(var.addr)..")")
+							else
+								-- if we have more than 1 child then create a struct
+								-- and in that case, struct name = global name ... hmmmm
+								if not ch.child then
+									error("got a global with no children and no type-name and no pointer-type")
+								elseif #ch.child == 1 then
+									-- read as a type
+									local typeNode, code = makeTypeNode(
+										ch.child[1],
+										nil,
+										globalTypesUsed
+									)
+									assert(string.trim(code) == '')
+									globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(typeNode):declare().."', "..('0x%x'):format(var.addr)..")")
+								else
+									-- read as a struct
+									local typeNode, code = makeStructNode(
+										ch,
+										makeTypeName(name),
+										globalTypesUsed
+									)
+									assert(Type:isa(typeNode))
+									if string.trim(code) ~= '' then
+										globalStructDefs:insert(code)
+									end
+									globalObjDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(typeNode):declare().."', "..('0x%x'):format(var.addr)..")")
 								end
 							end
-							structDefs:insert('} '..structName..';')
-							structDefs:insert'\n'
-							typename = structName
-							globalObjDefs:insert("df."..name.." = ffi.cast('"..typename.."*', "..('0x%x'):format(var.addr)..")")
 						end
 					end
---]==]
-				end
-
+				end, function(err)
+					return 'for global '..name..'\n'
+						..err..'\n'
+						..debug.traceback()
+				end))
 			else
 				error("unknown node: "..require 'ext.tolua'{
 					f = tostring(f),
@@ -783,11 +761,21 @@ end
 
 local globalOutPath = (destdir/('globals.lua'))
 assert(not globalOutPath:exists(), "file "..globalOutPath.." already exists!")
-globalOutPath:write(table{
-		"local ffi = require 'ffi'",
-		"ffi.cdef[[",
-	}:append(structDefs):append{
-		"]]",
-	}:append(globalObjDefs)
+globalOutPath:write(
+	table()
+	:append( (function()
+		local s = string.trim(buildTypesUsed(globalTypesUsed))
+		return s ~= '' and s or nil
+	end)() )
+	:append( (function()
+		if #globalStructDefs == 0 then return nil end
+		return table{
+			"local ffi = require 'ffi'",
+			"ffi.cdef[[",
+		}:append(globalStructDefs):append{
+			"]]",
+		}
+	end)() )
+	:append(globalObjDefs)
 	:concat'\n'..'\n'
 )
