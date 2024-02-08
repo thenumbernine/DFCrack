@@ -308,6 +308,9 @@ function Emitter:init(args)
 	-- used by StructEmitter and global Emitter
 	-- if a struct goes here then it shouldn't go in the typesUsed
 	self.structDefs = table()
+
+	-- keep track of what names have been used so far in the case of a name collision
+	self.localStructNames = {}
 end
 
 function Emitter:write()
@@ -594,6 +597,8 @@ function Emitter:makeStructNode(
 								else
 									-- if this is inserted prior then we don't want to require its name, so no .typesUsed
 									self.structDefs:insert(code)
+									-- tell future structs not to use this name ... hmm ... how to connect all those dots
+									self.localStructNames[fieldType:makeLuaName()] = true
 								end
 							else
 								-- no struct def -- add type
