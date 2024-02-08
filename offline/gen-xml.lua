@@ -307,7 +307,7 @@ function Emitter:init(args)
 	-- collections of strings to be turned into ffi.cdef's
 	-- used by StructEmitter and global Emitter
 	-- if a struct goes here then it shouldn't go in the typesUsed
-	self.structDefs = table()
+	self.outStmts = table()
 
 	-- keep track of what names have been used so far in the case of a name collision
 	self.localStructNames = {}
@@ -338,7 +338,13 @@ function Emitter:getTypeFromAttrOrChildren(
 	assert(namespace)
 	
 	local typeName = htmlcommon.findattr(node, 'type-name')
-	if typeName then return Type(typeName) end
+	if typeName then
+		-- i think here and only here is this magic value used ...
+		if typeName == 'pointer' then
+			return PtrType(Type'void')
+		end
+		return Type(typeName)
+	end
 	
 	local pointerType = htmlcommon.findattr(node, 'pointer-type')
 	if pointerType then return PtrType(Type(pointerType)) end
@@ -443,9 +449,15 @@ function Emitter:makeTypeNode(
 				namespace
 			)
 			assert(templateType)
+			
+			-- this is inserting any declaration of inline struct that might be used in the deque definition
 			if code and string.trim(code) ~= '' then
-				out:insert(code)
+				self.outStmts:insert'ffi.cdef[['
+				self.outStmts:insert(code)
+				self.outStmts:insert']]'
 			end
+			self.outStmts:insert("makeSTLDeque'"..templateType:makeLuaName().."'")
+			
 			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
 			local templateType, code = self:getTypeFromAttrOrChildren(
@@ -454,9 +466,15 @@ function Emitter:makeTypeNode(
 			)
 			-- stl-vector has default template-type of void*
 			templateType = templateType or PtrType(Type'void')
+		
+			-- this is inserting any declaration of inline struct that might be used in the vector definition
 			if code and string.trim(code) ~= '' then
-				out:insert(code)
+				self.outStmts:insert'ffi.cdef[['
+				self.outStmts:insert(code)
+				self.outStmts:insert']]'
 			end
+			self.outStmts:insert("makeSTLVector'"..templateType:makeLuaName().."'")
+
 			return STLVectorType(templateType)
 		elseif fieldtag == 'df-flagarray' then
 			local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
@@ -596,7 +614,9 @@ function Emitter:makeStructNode(
 									-- if this is an anon struct then it shouldn't have any types, right? so no .typesUsed
 								else
 									-- if this is inserted prior then we don't want to require its name, so no .typesUsed
-									self.structDefs:insert(code)
+									self.outStmts:insert'ffi.cdef[['
+									self.outStmts:insert(code)
+									self.outStmts:insert']]'
 									-- tell future structs not to use this name ... hmm ... how to connect all those dots
 									self.localStructNames[fieldType:makeLuaName()] = true
 								end
@@ -701,12 +721,12 @@ function StructEmitter:process(ch)
 	if string.trim(code) ~= '' then
 		-- need to also keep track of the code's typename
 		-- this way subsequent typedefs don't have colliding typenames (like we find in enabler)
-		self.structDefs:insert(code)
+		self.outStmts:insert'ffi.cdef[['
+		self.outStmts:insert(code)
+		self.outStmts:insert']]'
 	end
-	for _,code in ipairs(self.structDefs) do
-		out:insert'ffi.cdef[['
+	for _,code in ipairs(self.outStmts) do
 		out:insert(code)
-		out:insert']]'
 	end
 
 	-- insert require() stmts
