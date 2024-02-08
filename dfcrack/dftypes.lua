@@ -16,6 +16,7 @@ typedef vec3i_t int3_t;
 ]]
 
 require 'std.string'
+require 'std.fstream'
 local makeStdVector = require 'std.vector'
 local makeList = require 'list'
 local makeDfArray = require 'dfarray'
@@ -36,24 +37,28 @@ makeStdVector('std_string', 'vector_string')
 makeStdVector('bool', 'vector_bool')
 
 -- 'T' is the ptr base type
-local function makeVectorPtr(T, name)
+local function makeStdVectorPtr(T, name)
 	-- TODO '_ptr' suffix vs 'p' prefix?
 	name = name or 'vector_'..T..'_ptr'
 	return makeStdVector(T..' *', name)
 end
 
-makeVectorPtr'int'
+makeStdVectorPtr'int'
+makeStdVectorPtr('std_string', 'vector_string_ptr')
 
-makeDfArray('uint8_t', 'dfarray_byte')
+makeDfArray('uint8_t', 'dfarray_uint8')
+makeDfArray('int16_t', 'dfarray_int16')
+ffi.cdef'typedef dfarray_uint8 dfarray_byte;'	-- right?
 makeDfArray'short'
 
 -- except that its indexes and size are >>3
-ffi.cdef[[typedef dfarray_byte dfarray_bit;]]
+-- BitArray
+makeDfArray('uint8_t', 'DFBitArray', 'uint32_t')
 
 -- fwd decls:
 
 ffi.cdef'typedef struct Building Building;'
-makeVectorPtr'Building'
+makeStdVectorPtr'Building'
 
 -- coord.h, coord2d.h
 
@@ -79,7 +84,7 @@ typedef struct Rect2pt5D {
 } Rect2pt5D;
 typedef Rect2pt5D CoordRect;
 ]]
-makeVectorPtr'CoordRect'
+makeStdVectorPtr'CoordRect'
 
 -- coord2d_path.h
 
@@ -137,7 +142,7 @@ typedef struct GeneralRef {
 	void * vtable;	/* todo */
 } GeneralRef;
 ]]
-makeVectorPtr'GeneralRef'
+makeStdVectorPtr'GeneralRef'
 
 -- specific_ref_type.h
 
@@ -210,7 +215,7 @@ typedef struct SpecificRef {
 	};
 } SpecificRef;
 ]]
-makeVectorPtr'SpecificRef'
+makeStdVectorPtr'SpecificRef'
 
 -- historical_entity.h
 
@@ -237,7 +242,7 @@ typedef struct WorldPopulationRef {
 	int16_t region_x;
 	int16_t region_y;
 	int16_t feature_idx;
-	int32_t cave_id;
+	int32_t caveID;
 	int32_t unk_28;
 	int32_t population_idx;
 	LayerType depth;
@@ -635,19 +640,19 @@ typedef struct LanguageName {
 
 -- TODO
 ffi.cdef'typedef struct LanguageWord LanguageWord;'
-makeVectorPtr'LanguageWord'
+makeStdVectorPtr'LanguageWord'
 
 -- language_symbol.h
 
 -- TODO
 ffi.cdef'typedef struct LanguageSymbol LanguageSymbol;'
-makeVectorPtr'LanguageSymbol'
+makeStdVectorPtr'LanguageSymbol'
 
 -- language_translation.h
 
 -- TODO
 ffi.cdef'typedef struct LanguageTranslation LanguageTranslation;'
-makeVectorPtr'LanguageTranslation'
+makeStdVectorPtr'LanguageTranslation'
 
 -- language_word_table.h
 
@@ -1282,7 +1287,7 @@ typedef struct {
 
 -- TODO
 ffi.cdef'typedef struct UnitWound UnitWound;'
-makeVectorPtr'UnitWound'
+makeStdVectorPtr'UnitWound'
 
 -- caste_body_info.h
 
@@ -1320,75 +1325,75 @@ typedef struct {
 
 -- TODO
 ffi.cdef[[typedef struct Spatter Spatter;]]
-makeVectorPtr'Spatter'
+makeStdVectorPtr'Spatter'
 
 -- unit_action.h
 
 -- TODO
 ffi.cdef[[typedef struct UnitAction UnitAction;]]
-makeVectorPtr'UnitAction'
+makeStdVectorPtr'UnitAction'
 
 -- death_type.h
 
 ffi.cdef[[
 typedef int16_t DeathType;
 enum {
-	DeathType_NONE = -1, // -1, 0xFFFFFFFFFFFFFFFF
-	DeathType_OLD_AGE, // 0, 0x0
-	DeathType_HUNGER, // 1, 0x1
-	DeathType_THIRST, // 2, 0x2
-	DeathType_SHOT, // 3, 0x3
-	DeathType_BLEED, // 4, 0x4
-	DeathType_DROWN, // 5, 0x5
-	DeathType_SUFFOCATE, // 6, 0x6
-	DeathType_STRUCK_DOWN, // 7, 0x7
-	DeathType_SCUTTLE, // 8, 0x8
-	DeathType_COLLISION, // 9, 0x9
-	DeathType_MAGMA, // 10, 0xA
-	DeathType_MAGMA_MIST, // 11, 0xB
-	DeathType_DRAGONFIRE, // 12, 0xC
-	DeathType_FIRE, // 13, 0xD
-	DeathType_SCALD, // 14, 0xE
-	DeathType_CAVEIN, // 15, 0xF
-	DeathType_DRAWBRIDGE, // 16, 0x10
-	DeathType_FALLING_ROCKS, // 17, 0x11
-	DeathType_CHASM, // 18, 0x12
-	DeathType_CAGE, // 19, 0x13
-	DeathType_MURDER, // 20, 0x14
-	DeathType_TRAP, // 21, 0x15
-	DeathType_VANISH, // 22, 0x16
-	DeathType_QUIT, // 23, 0x17
-	DeathType_ABANDON, // 24, 0x18
-	DeathType_HEAT, // 25, 0x19
-	DeathType_COLD, // 26, 0x1A
-	DeathType_SPIKE, // 27, 0x1B
-	DeathType_ENCASE_LAVA, // 28, 0x1C
-	DeathType_ENCASE_MAGMA, // 29, 0x1D
-	DeathType_ENCASE_ICE, // 30, 0x1E
-	DeathType_BEHEAD, // 31, 0x1F
-	DeathType_CRUCIFY, // 32, 0x20
-	DeathType_BURY_ALIVE, // 33, 0x21
-	DeathType_DROWN_ALT, // 34, 0x22
-	DeathType_BURN_ALIVE, // 35, 0x23
-	DeathType_FEED_TO_BEASTS, // 36, 0x24
-	DeathType_HACK_TO_PIECES, // 37, 0x25
-	DeathType_LEAVE_OUT_IN_AIR, // 38, 0x26
-	DeathType_BOIL, // 39, 0x27
-	DeathType_MELT, // 40, 0x28
-	DeathType_CONDENSE, // 41, 0x29
-	DeathType_SOLIDIFY, // 42, 0x2A
-	DeathType_INFECTION, // 43, 0x2B
-	DeathType_MEMORIALIZE, // 44, 0x2C
-	DeathType_SCARE, // 45, 0x2D
-	DeathType_DARKNESS, // 46, 0x2E
-	DeathType_COLLAPSE, // 47, 0x2F
-	DeathType_DRAIN_BLOOD, // 48, 0x30
-	DeathType_SLAUGHTER, // 49, 0x31
-	DeathType_VEHICLE, // 50, 0x32
-	DeathType_FALLING_OBJECT, // 51, 0x33
-	DeathType_LEAPT_FROM_HEIGHT, // 52, 0x34
-	DeathType_DROWN_ALT2, // 53, 0x35
-	DeathType_EXECUTION_GENERIC, // 54, 0x36
+	DeathType_NONE = -1, /* -1, 0xFFFFFFFFFFFFFFFF*/
+	DeathType_OLD_AGE, /* 0, 0x0*/
+	DeathType_HUNGER, /* 1, 0x1*/
+	DeathType_THIRST, /* 2, 0x2*/
+	DeathType_SHOT, /* 3, 0x3*/
+	DeathType_BLEED, /* 4, 0x4*/
+	DeathType_DROWN, /* 5, 0x5*/
+	DeathType_SUFFOCATE, /* 6, 0x6*/
+	DeathType_STRUCK_DOWN, /* 7, 0x7*/
+	DeathType_SCUTTLE, /* 8, 0x8*/
+	DeathType_COLLISION, /* 9, 0x9*/
+	DeathType_MAGMA, /* 10, 0xA*/
+	DeathType_MAGMA_MIST, /* 11, 0xB*/
+	DeathType_DRAGONFIRE, /* 12, 0xC*/
+	DeathType_FIRE, /* 13, 0xD*/
+	DeathType_SCALD, /* 14, 0xE*/
+	DeathType_CAVEIN, /* 15, 0xF*/
+	DeathType_DRAWBRIDGE, /* 16, 0x10*/
+	DeathType_FALLING_ROCKS, /* 17, 0x11*/
+	DeathType_CHASM, /* 18, 0x12*/
+	DeathType_CAGE, /* 19, 0x13*/
+	DeathType_MURDER, /* 20, 0x14*/
+	DeathType_TRAP, /* 21, 0x15*/
+	DeathType_VANISH, /* 22, 0x16*/
+	DeathType_QUIT, /* 23, 0x17*/
+	DeathType_ABANDON, /* 24, 0x18*/
+	DeathType_HEAT, /* 25, 0x19*/
+	DeathType_COLD, /* 26, 0x1A*/
+	DeathType_SPIKE, /* 27, 0x1B*/
+	DeathType_ENCASE_LAVA, /* 28, 0x1C*/
+	DeathType_ENCASE_MAGMA, /* 29, 0x1D*/
+	DeathType_ENCASE_ICE, /* 30, 0x1E*/
+	DeathType_BEHEAD, /* 31, 0x1F*/
+	DeathType_CRUCIFY, /* 32, 0x20*/
+	DeathType_BURY_ALIVE, /* 33, 0x21*/
+	DeathType_DROWN_ALT, /* 34, 0x22*/
+	DeathType_BURN_ALIVE, /* 35, 0x23*/
+	DeathType_FEED_TO_BEASTS, /* 36, 0x24*/
+	DeathType_HACK_TO_PIECES, /* 37, 0x25*/
+	DeathType_LEAVE_OUT_IN_AIR, /* 38, 0x26*/
+	DeathType_BOIL, /* 39, 0x27*/
+	DeathType_MELT, /* 40, 0x28*/
+	DeathType_CONDENSE, /* 41, 0x29*/
+	DeathType_SOLIDIFY, /* 42, 0x2A*/
+	DeathType_INFECTION, /* 43, 0x2B*/
+	DeathType_MEMORIALIZE, /* 44, 0x2C*/
+	DeathType_SCARE, /* 45, 0x2D*/
+	DeathType_DARKNESS, /* 46, 0x2E*/
+	DeathType_COLLAPSE, /* 47, 0x2F*/
+	DeathType_DRAIN_BLOOD, /* 48, 0x30*/
+	DeathType_SLAUGHTER, /* 49, 0x31*/
+	DeathType_VEHICLE, /* 50, 0x32*/
+	DeathType_FALLING_OBJECT, /* 51, 0x33*/
+	DeathType_LEAPT_FROM_HEIGHT, /* 52, 0x34*/
+	DeathType_DROWN_ALT2, /* 53, 0x35*/
+	DeathType_EXECUTION_GENERIC, /* 54, 0x36*/
 };
 ]]
 
@@ -1407,55 +1412,55 @@ typedef struct {
 
 -- TODO
 ffi.cdef'typedef struct UnitMiscTrait UnitMiscTrait;'
-makeVectorPtr'UnitMiscTrait'
+makeStdVectorPtr'UnitMiscTrait'
 
 -- unit_soul.h
 
 -- TODO
 ffi.cdef'typedef struct UnitSoul UnitSoul;'
-makeVectorPtr'UnitSoul'
+makeStdVectorPtr'UnitSoul'
 
 -- unit_demand.h
 
 -- TODO
 ffi.cdef'typedef struct UnitDemand UnitDemand;'
-makeVectorPtr'UnitDemand'
+makeStdVectorPtr'UnitDemand'
 
 -- unit_item_wrestle.h
 
 -- TODO
 ffi.cdef'typedef struct UnitItemWrestle UnitItemWrestle;'
-makeVectorPtr'UnitItemWrestle'
+makeStdVectorPtr'UnitItemWrestle'
 
 -- unit_complaint.h
 
 -- TODO
 ffi.cdef'typedef struct UnitComplaint UnitComplaint;'
-makeVectorPtr'UnitComplaint'
+makeStdVectorPtr'UnitComplaint'
 
 -- unit_unk_138.h
 
 -- TODO
 ffi.cdef'typedef struct UnitUnknown138 UnitUnknown138;'
-makeVectorPtr'UnitUnknown138'
+makeStdVectorPtr'UnitUnknown138'
 
 -- unit_request.h
 
 -- TODO
 ffi.cdef'typedef struct UnitRequest UnitRequest;'
-makeVectorPtr'UnitRequest'
+makeStdVectorPtr'UnitRequest'
 
 -- unit_coin_debt.h
 
 -- TODO
 ffi.cdef'typedef struct UnitCoinDebt UnitCoinDebt;'
-makeVectorPtr'UnitCoinDebt'
+makeStdVectorPtr'UnitCoinDebt'
 
 -- temperaturest.h
 
 -- TODO
 ffi.cdef'typedef struct Temperaturest Temperaturest;'
-makeVectorPtr'Temperaturest'
+makeStdVectorPtr'Temperaturest'
 
 -- tile_designation.h
 
@@ -1492,7 +1497,7 @@ typedef union {
 
 -- TODO
 ffi.cdef'typedef struct UnitSyndrome UnitSyndrome;'
-makeVectorPtr'UnitSyndrome'
+makeStdVectorPtr'UnitSyndrome'
 
 -- unit_health_info.h
 
@@ -1503,41 +1508,41 @@ ffi.cdef'typedef struct UnitHealthInfo UnitHealthInfo;'
 
 -- TODO
 ffi.cdef'typedef struct UnitItemUse UnitItemUse;'
-makeVectorPtr'UnitItemUse'
+makeStdVectorPtr'UnitItemUse'
 
 -- unit_appearance.h
 
 -- TODO
 ffi.cdef'typedef struct UnitAppearance UnitAppearance;'
-makeVectorPtr'UnitAppearance'
+makeStdVectorPtr'UnitAppearance'
 
 -- witness_report.h
 
 -- TODO
 ffi.cdef'typedef struct WitnessReport WitnessReport;'
-makeVectorPtr'WitnessReport'
+makeStdVectorPtr'WitnessReport'
 
 -- entity_event.h
 
 -- TODO
 ffi.cdef'typedef struct EntityEvent EntityEvent;'
-makeVectorPtr'EntityEvent'
+makeStdVectorPtr'EntityEvent'
 
 -- army_controller.h
 
 ffi.cdef'typedef struct ArmyController ArmyController;'
-makeVectorPtr'ArmyController'
+makeStdVectorPtr'ArmyController'
 
 -- occupation.h
 
 ffi.cdef'typedef struct Occupation Occupation;'
-makeVectorPtr'Occupation'
+makeStdVectorPtr'Occupation'
 
 -- unit_inventory_item.h
 
 -- TODO
 ffi.cdef'typedef struct UnitInventoryItem UnitInventoryItem;'
-makeVectorPtr'UnitInventoryItem'
+makeStdVectorPtr'UnitInventoryItem'
 
 -- unit_ghost_info.h
 
@@ -1549,12 +1554,12 @@ ffi.cdef'typedef struct UnitGhostInfo UnitGhostInfo;'
 ffi.cdef[[
 typedef int16_t SoldierMood;
 enum {
-	SoldierMood_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
-	SoldierMood_MartialTrance, // 0, 0x0
-	SoldierMood_Enraged, // 1, 0x1
-	SoldierMood_Tantrum, // 2, 0x2
-	SoldierMood_Depressed, // 3, 0x3
-	SoldierMood_Oblivious, // 4, 0x4
+	SoldierMood_None = -1, /* -1, 0xFFFFFFFFFFFFFFFF*/
+	SoldierMood_MartialTrance, /* 0, 0x0*/
+	SoldierMood_Enraged, /* 1, 0x1*/
+	SoldierMood_Tantrum, /* 2, 0x2*/
+	SoldierMood_Depressed, /* 3, 0x3*/
+	SoldierMood_Oblivious, /* 4, 0x4*/
 };
 ]]
 
@@ -1579,7 +1584,7 @@ typedef struct {
 	int16_t unk_7;
 } UnitStatusUnknown1;
 ]]
-makeVectorPtr'UnitStatusUnknown1' 
+makeStdVectorPtr'UnitStatusUnknown1' 
 
 ffi.cdef[[
 typedef struct {
@@ -1599,7 +1604,7 @@ typedef struct {
 	int32_t unk_sub1_9;
 } UnitEnemyUnknownv40Sub3_Unknown7_UnknownSub1;
 ]]
-makeVectorPtr'UnitEnemyUnknownv40Sub3_Unknown7_UnknownSub1'
+makeStdVectorPtr'UnitEnemyUnknownv40Sub3_Unknown7_UnknownSub1'
 
 ffi.cdef[[
 typedef int8_t UnitVisionCone[21][21];
@@ -1871,8 +1876,8 @@ struct Unit {
 		vector_int32 bp_modifiers;
 		int32_t size_modifier; /*!< product of all H/B/LENGTH body modifiers, in % */
 		vector_int16 tissue_style;
-		vector_int32 tissue_style_civ_id;
-		vector_int32 tissue_style_id;
+		vector_int32 tissue_style_civID;
+		vector_int32 tissue_styleID;
 		vector_int32 tissue_style_type;
 		vector_int32 tissue_length; /*!< description uses bp_modifiers[style_list_idx[index] ] */
 		UnitGenes genes;
@@ -1923,7 +1928,7 @@ struct Unit {
 		CurseAttrChange * attr_change; /*!< since v0.34.01 */
 		uint32_t luck_mul_percent; /*!< since v0.34.01 */
 		int32_t unk_98; /*!< since v0.42.01 */
-		vector_int32 interaction_id; /*!< since v0.34.01 */
+		vector_int32 interactionID; /*!< since v0.34.01 */
 		vector_int32 interaction_time; /*!< since v0.34.01 */
 		vector_int32 interaction_delay; /*!< since v0.34.01 */
 		int32_t time_on_site; /*!< since v0.34.01 */
@@ -2092,7 +2097,7 @@ struct Unit {
 		
 		int32_t unk_450; /*!< since v0.40.01 */
 		int32_t unk_454; /*!< since v0.40.01 */
-		int32_t army_controller_id; /*!< since v0.40.01 */
+		int32_t army_controllerID; /*!< since v0.40.01 */
 		
 		/**
 		 * Since v0.40.01
@@ -2129,8 +2134,8 @@ struct Unit {
 				int32_t unk_7;
 			} * unk_7; /*!< since v0.42.01 */
 		} unk_v40_sub3; /*!< since v0.40.01 */
-		int32_t combat_side_id;
-		dfarray_bit/*CasteRawFlags*/ casteFlags; /*!< since v0.44.06 */
+		int32_t combat_sideID;
+		DFBitArray/*CasteRawFlags*/ casteFlags; /*!< since v0.44.06 */
 		int32_t enemyStatusSlot;
 		int32_t unk_874_cntr;
 		vector_uint8 body_part_878;
@@ -2304,7 +2309,7 @@ typedef struct {
 
 -- cursed_tomb.h
 
-makeVectorPtr'Rect3D'
+makeStdVectorPtr'Rect3D'
 
 ffi.cdef[[
 typedef struct {
@@ -2341,7 +2346,7 @@ enum {
 ffi.cdef[[
 typedef struct Job Job;
 ]]
-makeVectorPtr'Job'
+makeStdVectorPtr'Job'
 
 -- job_list_link.h
 
@@ -2357,7 +2362,7 @@ typedef struct {
 	int32_t unk_1;
 } JobHandlerPosting;
 ]]
-makeVectorPtr'JobHandlerPosting'
+makeStdVectorPtr'JobHandlerPosting'
 
 ffi.cdef[[
 typedef struct {
@@ -2407,7 +2412,7 @@ typedef struct {
 	int32_t timer;
 } BuildingJobClaimSuppress;
 ]]
-makeVectorPtr'BuildingJobClaimSuppress'
+makeStdVectorPtr'BuildingJobClaimSuppress'
 
 ffi.cdef[[
 typedef struct {
@@ -2415,7 +2420,7 @@ typedef struct {
 	int32_t eventid;
 } BuildingActivity;
 ]]
-makeVectorPtr'BuildingActivity'
+makeStdVectorPtr'BuildingActivity'
 
 ffi.cdef[[
 typedef struct {
@@ -2483,61 +2488,61 @@ makeList'Projectile'
 
 -- TODO
 ffi.cdef'typedef struct Machine Machine;'
-makeVectorPtr'Machine'
+makeStdVectorPtr'Machine'
 
 -- flow_guide.h
 
 -- TODO
 ffi.cdef'typedef struct FlowGuide FlowGuide;'
-makeVectorPtr'FlowGuide'
+makeStdVectorPtr'FlowGuide'
 
 -- plant.h
 
 -- TODO
 ffi.cdef'typedef struct Plant Plant;'
-makeVectorPtr'Plant'
+makeStdVectorPtr'Plant'
 
 -- schedule_info.h
 
 -- TODO
 ffi.cdef'typedef struct ScheduleInfo ScheduleInfo;'
-makeVectorPtr'ScheduleInfo'
+makeStdVectorPtr'ScheduleInfo'
 
 -- squad.h
 
 -- TODO
 ffi.cdef'typedef struct Squad Squad;'
-makeVectorPtr'Squad'
+makeStdVectorPtr'Squad'
 
 -- activity_entry.h
 
 ffi.cdef'typedef struct ActivityEntry ActivityEntry;'
-makeVectorPtr'ActivityEntry'
+makeStdVectorPtr'ActivityEntry'
 
 -- report.h
 
 ffi.cdef'typedef struct Report Report;'
-makeVectorPtr'Report'
+makeStdVectorPtr'Report'
 
 -- popup_mesage.h
 
 ffi.cdef'typedef struct PopupMessage PopupMessage;'
-makeVectorPtr'PopupMessage'
+makeStdVectorPtr'PopupMessage'
 
 -- mission_report.h
 
 ffi.cdef'typedef struct MissionReport MissionReport;'
-makeVectorPtr'MissionReport'
+makeStdVectorPtr'MissionReport'
 
 -- spoils_report.h
 
 ffi.cdef'typedef struct SpoilsReport SpoilsReport;'
-makeVectorPtr'SpoilsReport'
+makeStdVectorPtr'SpoilsReport'
 
 -- interrogation_report.h
 
 ffi.cdef'typedef struct InterrogationReport InterrogationReport;'
-makeVectorPtr'InterrogationReport'
+makeStdVectorPtr'InterrogationReport'
 
 -- combat_report_event_type.h
 
@@ -2585,87 +2590,87 @@ enum {
 -- interaction_instance.h
 
 ffi.cdef'typedef struct InteractionInstance InteractionInstance;'
-makeVectorPtr'InteractionInstance'
+makeStdVectorPtr'InteractionInstance'
 
 -- written_content.h
 
 ffi.cdef'typedef struct WrittenContent WrittenContent;'
-makeVectorPtr'WrittenContent'
+makeStdVectorPtr'WrittenContent'
 
 -- identity.h
 
 ffi.cdef'typedef struct Identity Identity;'
-makeVectorPtr'Identity'
+makeStdVectorPtr'Identity'
 
 -- incident.h
 
 ffi.cdef'typedef struct Incident Incident;'
-makeVectorPtr'Incident'
+makeStdVectorPtr'Incident'
 
 -- crime.h
 
 ffi.cdef'typedef struct Crime Crime;'
-makeVectorPtr'Crime'
+makeStdVectorPtr'Crime'
 
 -- vehicle.h
 
 ffi.cdef'typedef struct Vehicle Vehicle;'
-makeVectorPtr'Vehicle'
+makeStdVectorPtr'Vehicle'
 
 -- army.h
 
 ffi.cdef'typedef struct Army Army;'
-makeVectorPtr'Army'
+makeStdVectorPtr'Army'
 
 -- cultural_identity.h
 
 ffi.cdef'typedef struct CulturalIdentity CulturalIdentity;'
-makeVectorPtr'CulturalIdentity'
+makeStdVectorPtr'CulturalIdentity'
 
 -- agreement.h
 
 ffi.cdef'typedef struct Agreement Agreement;'
-makeVectorPtr'Agreement'
+makeStdVectorPtr'Agreement'
 
 -- poetic_form.h
 
 ffi.cdef'typedef struct PoeticForm PoeticForm;'
-makeVectorPtr'PoeticForm'
+makeStdVectorPtr'PoeticForm'
 
 -- musical_form.h
 
 ffi.cdef'typedef struct MusicalForm MusicalForm;'
-makeVectorPtr'MusicalForm'
+makeStdVectorPtr'MusicalForm'
 
 -- dance_form.h
 
 ffi.cdef'typedef struct DanceForm DanceForm;'
-makeVectorPtr'DanceForm'
+makeStdVectorPtr'DanceForm'
 
 -- scale.h
 
 ffi.cdef'typedef struct Scale Scale;'
-makeVectorPtr'Scale'
+makeStdVectorPtr'Scale'
 
 -- rhythm.h
 
 ffi.cdef'typedef struct Rhythm Rhythm;'
-makeVectorPtr'Rhythm'
+makeStdVectorPtr'Rhythm'
 
 -- belief_system.h
 
 ffi.cdef'typedef struct BeliefSystem BeliefSystem;'
-makeVectorPtr'BeliefSystem'
+makeStdVectorPtr'BeliefSystem'
 
 -- image_set.h
 
 ffi.cdef'typedef struct ImageSet ImageSet;'
-makeVectorPtr'ImageSet'
+makeStdVectorPtr'ImageSet'
 
 -- divination_set.h
 
 ffi.cdef'typedef struct DivinationSet DivinationSet;'
-makeVectorPtr'DivinationSet'
+makeStdVectorPtr'DivinationSet'
 
 -- stockpile_category.h
 
@@ -2711,13 +2716,13 @@ enum {
 
 -- TODO
 ffi.cdef'typedef struct MapBlock MapBlock;'
-makeVectorPtr'MapBlock'
+makeStdVectorPtr'MapBlock'
 
 -- map_block_column.h
 
 -- TODO
 ffi.cdef'typedef struct MapBlockColumn MapBlockColumn;'
-makeVectorPtr'MapBlockColumn'
+makeStdVectorPtr'MapBlockColumn'
 
 -- z_level_flags.h
 
@@ -2736,37 +2741,403 @@ typedef union {
 
 --- TODO
 ffi.cdef'typedef struct BlockSquareEventSpoorst BlockSquareEventSpoorst;'
-makeVectorPtr'BlockSquareEventSpoorst'
+makeStdVectorPtr'BlockSquareEventSpoorst'
+
+-- orientation_flags.h
+
+ffi.cdef[[
+typedef struct OrientationFlags {
+	uint32_t flags;
+	struct {
+		uint32_t indeterminate : 1; /*!< only seen on adventurers */
+		uint32_t romanceMale : 1;
+		uint32_t marryMale : 1;
+		uint32_t romanceFemale : 1;
+		uint32_t marryFemale : 1;
+	};
+} OrientationFlags;
+]]
+
+-- histfig_entity_link_type.h
+
+ffi.cdef[[
+typedef int32_t HistfigEntityLinkType;
+enum {
+	HistfigEntityLinkType_MEMBER, // 0, 0x0
+	HistfigEntityLinkType_FORMER_MEMBER, // 1, 0x1
+	HistfigEntityLinkType_MERCENARY, // 2, 0x2
+	HistfigEntityLinkType_FORMER_MERCENARY, // 3, 0x3
+	HistfigEntityLinkType_SLAVE, // 4, 0x4
+	HistfigEntityLinkType_FORMER_SLAVE, // 5, 0x5
+	HistfigEntityLinkType_PRISONER, // 6, 0x6
+	HistfigEntityLinkType_FORMER_PRISONER, // 7, 0x7
+	HistfigEntityLinkType_ENEMY, // 8, 0x8
+	HistfigEntityLinkType_CRIMINAL, // 9, 0x9
+	HistfigEntityLinkType_POSITION, // 10, 0xA
+	HistfigEntityLinkType_FORMER_POSITION, // 11, 0xB
+	HistfigEntityLinkType_POSITION_CLAIM, // 12, 0xC
+	HistfigEntityLinkType_SQUAD, // 13, 0xD
+	HistfigEntityLinkType_FORMER_SQUAD, // 14, 0xE
+	HistfigEntityLinkType_OCCUPATION, // 15, 0xF
+	HistfigEntityLinkType_FORMER_OCCUPATION, // 16, 0x10
+};
+]]
+
+-- file_compressorst.h
+
+ffi.cdef[[
+typedef struct FileCompressorst {
+	bool compressed;					/* offset: 0x0 */
+	std_fstream f;						/* offset: 0x8 */
+	uint8_t * inBuffer;					/* offset: 0x218 */
+	long inBufferSize;					/* offset: 0x220 */
+	long inBufferAmountLoaded;			/* offset: 0x228 */
+	long inBufferPosition;				/* offset: 0x230 */
+	uint8_t * outBuffer;				/* offset: 0x238 */
+	long outBufferSize;					/* offset: 0x240 */
+	int32_t outBufferAmountWritten;		/* offset: 0x248 */
+} FileCompressorst;						/* sizeof: 0x250 */
+]]
+assert(ffi.sizeof'FileCompressorst' == 0x250)
+
+-- save_version.h
+
+ffi.cdef[[
+typedef int32_t SaveVersion;
+enum {
+	SaveVersion_v0_21_93_19a = 1107, /* 1107, 0x453*/
+	SaveVersion_v0_21_93_19c = 1108, /* 1108, 0x454*/
+	SaveVersion_v0_21_95_19a = 1108, /* 1108, 0x454*/
+	SaveVersion_v0_21_95_19b = 1108, /* 1108, 0x454*/
+	SaveVersion_v0_21_95_19c = 1110, /* 1110, 0x456*/
+	SaveVersion_v0_21_104_19d = 1121, /* 1121, 0x461*/
+	SaveVersion_v0_21_104_21a = 1123, /* 1123, 0x463*/
+	SaveVersion_v0_21_104_21b = 1125, /* 1125, 0x465*/
+	SaveVersion_v0_21_105_21a = 1128, /* 1128, 0x468*/
+	SaveVersion_v0_22_107_21a = 1128, /* 1128, 0x468*/
+	SaveVersion_v0_22_110_22e = 1134, /* 1134, 0x46E*/
+	SaveVersion_v0_22_110_22f = 1137, /* 1137, 0x471*/
+	SaveVersion_v0_22_110_23a = 1148, /* 1148, 0x47C*/
+	SaveVersion_v0_22_120_23a = 1151, /* 1151, 0x47F*/
+	SaveVersion_v0_22_121_23b = 1161, /* 1161, 0x489*/
+	SaveVersion_v0_22_123_23a = 1165, /* 1165, 0x48D*/
+	SaveVersion_v0_23_130_23a = 1169, /* 1169, 0x491*/
+	SaveVersion_v0_27_169_32a = 1205, /* 1205, 0x4B5*/
+	SaveVersion_v0_27_169_33a = 1206, /* 1206, 0x4B6*/
+	SaveVersion_v0_27_169_33b = 1209, /* 1209, 0x4B9*/
+	SaveVersion_v0_27_169_33c = 1211, /* 1211, 0x4BB*/
+	SaveVersion_v0_27_169_33d = 1212, /* 1212, 0x4BC*/
+	SaveVersion_v0_28_181_39b = 1255, /* 1255, 0x4E7*/
+	SaveVersion_v0_28_181_39c = 1256, /* 1256, 0x4E8*/
+	SaveVersion_v0_28_181_39d = 1259, /* 1259, 0x4EB*/
+	SaveVersion_v0_28_181_39e = 1260, /* 1260, 0x4EC*/
+	SaveVersion_v0_28_181_39f = 1261, /* 1261, 0x4ED*/
+	SaveVersion_v0_28_181_40a = 1265, /* 1265, 0x4F1*/
+	SaveVersion_v0_28_181_40b = 1266, /* 1266, 0x4F2*/
+	SaveVersion_v0_28_181_40c = 1267, /* 1267, 0x4F3*/
+	SaveVersion_v0_28_181_40d = 1268, /* 1268, 0x4F4*/
+	SaveVersion_v0_31_01 = 1287, /* 1287, 0x507*/
+	SaveVersion_v0_31_02 = 1288, /* 1288, 0x508*/
+	SaveVersion_v0_31_03 = 1289, /* 1289, 0x509*/
+	SaveVersion_v0_31_04 = 1292, /* 1292, 0x50C*/
+	SaveVersion_v0_31_05 = 1295, /* 1295, 0x50F*/
+	SaveVersion_v0_31_06 = 1297, /* 1297, 0x511*/
+	SaveVersion_v0_31_08 = 1300, /* 1300, 0x514*/
+	SaveVersion_v0_31_09 = 1304, /* 1304, 0x518*/
+	SaveVersion_v0_31_10 = 1305, /* 1305, 0x519*/
+	SaveVersion_v0_31_11 = 1310, /* 1310, 0x51E*/
+	SaveVersion_v0_31_12 = 1311, /* 1311, 0x51F*/
+	SaveVersion_v0_31_13 = 1323, /* 1323, 0x52B*/
+	SaveVersion_v0_31_14 = 1325, /* 1325, 0x52D*/
+	SaveVersion_v0_31_15 = 1326, /* 1326, 0x52E*/
+	SaveVersion_v0_31_16 = 1327, /* 1327, 0x52F*/
+	SaveVersion_v0_31_17 = 1340, /* 1340, 0x53C*/
+	SaveVersion_v0_31_18 = 1341, /* 1341, 0x53D*/
+	SaveVersion_v0_31_19 = 1351, /* 1351, 0x547*/
+	SaveVersion_v0_31_20 = 1353, /* 1353, 0x549*/
+	SaveVersion_v0_31_21 = 1354, /* 1354, 0x54A*/
+	SaveVersion_v0_31_22 = 1359, /* 1359, 0x54F*/
+	SaveVersion_v0_31_23 = 1360, /* 1360, 0x550*/
+	SaveVersion_v0_31_24 = 1361, /* 1361, 0x551*/
+	SaveVersion_v0_31_25 = 1362, /* 1362, 0x552*/
+	SaveVersion_v0_34_01 = 1372, /* 1372, 0x55C*/
+	SaveVersion_v0_34_02 = 1374, /* 1374, 0x55E*/
+	SaveVersion_v0_34_03 = 1376, /* 1376, 0x560*/
+	SaveVersion_v0_34_04 = 1377, /* 1377, 0x561*/
+	SaveVersion_v0_34_05 = 1378, /* 1378, 0x562*/
+	SaveVersion_v0_34_06 = 1382, /* 1382, 0x566*/
+	SaveVersion_v0_34_07 = 1383, /* 1383, 0x567*/
+	SaveVersion_v0_34_08 = 1400, /* 1400, 0x578*/
+	SaveVersion_v0_34_09 = 1402, /* 1402, 0x57A*/
+	SaveVersion_v0_34_10 = 1403, /* 1403, 0x57B*/
+	SaveVersion_v0_34_11 = 1404, /* 1404, 0x57C*/
+	SaveVersion_v0_40_01 = 1441, /* 1441, 0x5A1*/
+	SaveVersion_v0_40_02 = 1442, /* 1442, 0x5A2*/
+	SaveVersion_v0_40_03 = 1443, /* 1443, 0x5A3*/
+	SaveVersion_v0_40_04 = 1444, /* 1444, 0x5A4*/
+	SaveVersion_v0_40_05 = 1445, /* 1445, 0x5A5*/
+	SaveVersion_v0_40_06 = 1446, /* 1446, 0x5A6*/
+	SaveVersion_v0_40_07 = 1448, /* 1448, 0x5A8*/
+	SaveVersion_v0_40_08 = 1449, /* 1449, 0x5A9*/
+	SaveVersion_v0_40_09 = 1451, /* 1451, 0x5AB*/
+	SaveVersion_v0_40_10 = 1452, /* 1452, 0x5AC*/
+	SaveVersion_v0_40_11 = 1456, /* 1456, 0x5B0*/
+	SaveVersion_v0_40_12 = 1459, /* 1459, 0x5B3*/
+	SaveVersion_v0_40_13 = 1462, /* 1462, 0x5B6*/
+	SaveVersion_v0_40_14 = 1469, /* 1469, 0x5BD*/
+	SaveVersion_v0_40_15 = 1470, /* 1470, 0x5BE*/
+	SaveVersion_v0_40_16 = 1471, /* 1471, 0x5BF*/
+	SaveVersion_v0_40_17 = 1472, /* 1472, 0x5C0*/
+	SaveVersion_v0_40_18 = 1473, /* 1473, 0x5C1*/
+	SaveVersion_v0_40_19 = 1474, /* 1474, 0x5C2*/
+	SaveVersion_v0_40_20 = 1477, /* 1477, 0x5C5*/
+	SaveVersion_v0_40_21 = 1478, /* 1478, 0x5C6*/
+	SaveVersion_v0_40_22 = 1479, /* 1479, 0x5C7*/
+	SaveVersion_v0_40_23 = 1480, /* 1480, 0x5C8*/
+	SaveVersion_v0_40_24 = 1481, /* 1481, 0x5C9*/
+	SaveVersion_v0_42_01 = 1531, /* 1531, 0x5FB*/
+	SaveVersion_v0_42_02 = 1532, /* 1532, 0x5FC*/
+	SaveVersion_v0_42_03 = 1533, /* 1533, 0x5FD*/
+	SaveVersion_v0_42_04 = 1534, /* 1534, 0x5FE*/
+	SaveVersion_v0_42_05 = 1537, /* 1537, 0x601*/
+	SaveVersion_v0_42_06 = 1542, /* 1542, 0x606*/
+	SaveVersion_v0_43_01 = 1551, /* 1551, 0x60F*/
+	SaveVersion_v0_43_02 = 1552, /* 1552, 0x610*/
+	SaveVersion_v0_43_03 = 1553, /* 1553, 0x611*/
+	SaveVersion_v0_43_04 = 1555, /* 1555, 0x613*/
+	SaveVersion_v0_43_05 = 1556, /* 1556, 0x614*/
+	SaveVersion_v0_44_01 = 1596, /* 1596, 0x63C*/
+	SaveVersion_v0_44_02 = 1597, /* 1597, 0x63D*/
+	SaveVersion_v0_44_03 = 1600, /* 1600, 0x640*/
+	SaveVersion_v0_44_04 = 1603, /* 1603, 0x643*/
+	SaveVersion_v0_44_05 = 1604, /* 1604, 0x644*/
+	SaveVersion_v0_44_06 = 1611, /* 1611, 0x64B*/
+	SaveVersion_v0_44_07 = 1612, /* 1612, 0x64C*/
+	SaveVersion_v0_44_08 = 1613, /* 1613, 0x64D*/
+	SaveVersion_v0_44_09 = 1614, /* 1614, 0x64E*/
+	SaveVersion_v0_44_10 = 1620, /* 1620, 0x654*/
+	SaveVersion_v0_44_11 = 1623, /* 1623, 0x657*/
+	SaveVersion_v0_44_12 = 1625, /* 1625, 0x659*/
+	SaveVersion_v0_47_01 = 1710, /* 1710, 0x6AE*/
+	SaveVersion_v0_47_02 = 1711, /* 1711, 0x6AF*/
+	SaveVersion_v0_47_03 = 1713, /* 1713, 0x6B1*/
+	SaveVersion_v0_47_04 = 1715, /* 1715, 0x6B3*/
+	SaveVersion_v0_47_05 = 1716, /* 1716, 0x6B4*/
+};
+]]
+
+-- histfig_entity_link.h
+
+-- why is this called link again?
+ffi.cdef[[
+typedef struct HistfigEntityLink HistfigEntityLink;
+
+typedef struct HistfigEntityLink_vtable {
+	HistfigEntityLinkType (*getType)(HistfigEntityLink *);
+	void (*dtor)(HistfigEntityLink *);
+	void (*writeFile)(HistfigEntityLink *, FileCompressorst *);
+	void (*readFile)(HistfigEntityLink *, FileCompressorst *, SaveVersion);
+	void (*anon_4)(HistfigEntityLink *);
+	void (*anon_5)(HistfigEntityLink *);
+	int32_t (*getPosition)(HistfigEntityLink *);
+	int32_t (*getOccupation)(HistfigEntityLink *);
+	int32_t (*getPositionStartYear)(HistfigEntityLink *);
+	int32_t (*getPositionEndYear)(HistfigEntityLink *);
+	void (*generateXML)(HistfigEntityLink *, std_fstream *, int32_t);
+} HistfigEntityLink_vtable;
+
+struct HistfigEntityLink {
+	HistfigEntityLink_vtable * vtable;
+    int32_t entityID;
+    int16_t linkStrength;
+};
+]]
+makeStdVectorPtr'HistfigEntityLink'
+
+-- histfig_site_link.h
+
+ffi.cdef[[
+typedef struct HistfigSiteLink {
+    void * vtable;
+	int32_t site;
+    int32_t subID; /*!< from XML */
+    int32_t entity;
+} HistfigSiteLink;
+]]
+makeStdVectorPtr'HistfigSiteLink'
+
+-- histfig_hf_link.h
+
+ffi.cdef[[
+typedef struct HistfigHFLink {
+    int32_t targetHF;
+    int16_t linkStrength;
+} HistfigHFLink;
+]]
+makeStdVectorPtr'HistfigHFLink'
+
+-- historical_figure_info.h
+
+-- TODO
+ffi.cdef'typedef struct HistoricalFigureInfo HistoricalFigureInfo;'
+
+-- vague_relationship_type.h
+
+ffi.cdef[[
+typedef int16_t VagueRelationshipType;
+enum {
+	VagueRelationshipType_none = -1, /* -1, 0xFFFFFFFFFFFFFFFF*/
+	VagueRelationshipType_childhood_friend, /* 0, 0x0*/
+	VagueRelationshipType_war_buddy, /* 1, 0x1*/
+	VagueRelationshipType_jealous_obsession, /* 2, 0x2*/
+	VagueRelationshipType_jealous_relationship_grudge, /* 3, 0x3*/
+	VagueRelationshipType_lover, /* 4, 0x4*/
+	/**
+	* broke up
+	*/
+	VagueRelationshipType_former_lover, /* 5, 0x5*/
+	VagueRelationshipType_scholar_buddy, /* 6, 0x6*/
+	VagueRelationshipType_artistic_buddy, /* 7, 0x7*/
+	VagueRelationshipType_athlete_buddy, /* 8, 0x8*/
+	VagueRelationshipType_atheletic_rival, /* 9, 0x9*/
+	VagueRelationshipType_business_rival, /* 10, 0xA*/
+	VagueRelationshipType_religious_persecution_grudge, /* 11, 0xB*/
+	VagueRelationshipType_grudge, /* 12, 0xC*/
+	VagueRelationshipType_persecution_grudge, /* 13, 0xD*/
+	VagueRelationshipType_supernatural_grudge, /* 14, 0xE*/
+	VagueRelationshipType_lieutenant, /* 15, 0xF*/
+	VagueRelationshipType_worshipped_deity, /* 16, 0x10*/
+	VagueRelationshipType_spouse, /* 17, 0x11*/
+	VagueRelationshipType_mother, /* 18, 0x12*/
+	VagueRelationshipType_father, /* 19, 0x13*/
+	VagueRelationshipType_master, /* 20, 0x14*/
+	VagueRelationshipType_apprentice, /* 21, 0x15*/
+	VagueRelationshipType_companion, /* 22, 0x16*/
+	VagueRelationshipType_ex_spouse, /* 23, 0x17*/
+	VagueRelationshipType_neighbor, /* 24, 0x18*/
+	/**
+	* Religion/PerformanceTroupe/MerchantCompany/Guild
+	*/
+	VagueRelationshipType_shared_entity, /* 25, 0x19*/
+};
+]]
+
+-- world_site.h
+
+--- TODO
+ffi.cdef'typedef struct WorldSite WorldSite;'
+makeStdVectorPtr'WorldSite'
+
+-- world_region.h
+
+--- TODO
+ffi.cdef'typedef struct WorldRegion WorldRegion;'
+makeStdVectorPtr'WorldRegion'
+
+-- world_underground_region.h
+
+--- TODO
+ffi.cdef'typedef struct WorldUndergroundRegion WorldUndergroundRegion;'
+makeStdVectorPtr'WorldUndergroundRegion'
 
 -- historical_figure.h
 
 -- TODO
-makeVectorPtr'HistoricalFigure'
+ffi.cdef[[
+struct HistoricalFigure {
+	Profession profession;
+	int16_t race;
+	int16_t caste;
+	Gender sex;
+	OrientationFlags orientationFlags;
+	int32_t appeared_year;
+	int32_t born_year;
+	int32_t born_seconds;
+	int32_t curse_year; /*!< since v0.34.01 */
+	int32_t curse_seconds; /*!< since v0.34.01 */
+	int32_t birth_year_bias; /*!< since v0.34.01 */
+	int32_t birth_time_bias; /*!< since v0.34.01 */
+	int32_t old_year;
+	int32_t old_seconds;
+	int32_t died_year;
+	int32_t died_seconds;
+	LanguageName name;
+	int32_t civID;
+	int32_t populationID;
+	int32_t breedID; /*!< from legends export */
+	int32_t culturalIdentity; /*!< since v0.40.01 */
+	int32_t familyHeadID; /*!< since v0.44.01; When a unit is asked about their family in adventure mode, the historical figure corresponding to this ID is called the head of the family or ancestor. */
+	DFBitArray/*HistfigFlags*/ flags;
+	int32_t unitID;
+	int32_t nemesisID; /*!< since v0.40.01; sometimes garbage */
+	int32_t id;
+	int32_t unk4;
+	vector_HistfigEntityLink_ptr entityLinks;
+	vector_HistfigSiteLink_ptr siteLinks;
+	vector_HistfigHFLink_ptr histfigLinks;
+	HistoricalFigureInfo * info;
+	struct {
+		int32_t hfid[6];
+		VagueRelationshipType relationship[6]; /*!< unused elements are uninitialized */
+		int32_t count; /*!< number of hf/relationship pairs above */
+	} * vagueRelationships; /*!< Do not have to be available mutually, i.e. DF can display Legends relations forming for the other party that does not have an entry (plus time and other conditions not located) */
+	WorldSite * unk_f0;
+	WorldRegion * unk_f4;
+	WorldUndergroundRegion * unk_f8;
+	struct {
+		dfarray_uint8 unk_0;
+		dfarray_int16 unk_8;
+	} * unk_fc;
+	struct {
+		HistoricalFigure * unk_1;
+		HistoricalFigure * unk_2;
+		HistoricalFigure * unk_3;
+		HistoricalFigure * unk_4;
+		HistoricalFigure * unk_5;
+		HistoricalFigure * unk_6;
+		int16_t unk_7;
+		int16_t unk_8;
+		int16_t unk_9;
+		int16_t unk_10;
+		int16_t unk_11;
+		int16_t unk_12;
+		int32_t unk_13;
+		HistoricalFigure * unk_14;
+		HistoricalFigure * unk_15;
+		HistoricalFigure * unk_16;
+	} * unk_v47_2;
+	int32_t unk_v47_3;
+	int32_t unk_v47_4;
+	int32_t unk_v4019_1; /*!< since v0.40.17-19 */
+	int32_t unk_5;
+} HistoricalFigure;
+]]
+makeStdVectorPtr'HistoricalFigure'
 
 -- world_region_details.h
 
 --- TODO
 ffi.cdef'typedef struct WorldRegionDetails WorldRegionDetails;'
-makeVectorPtr'WorldRegionDetails'
+makeStdVectorPtr'WorldRegionDetails'
 
 -- world_construction_square.h
 
 --- TODO
 ffi.cdef'typedef struct WorldConstructionSquare WorldConstructionSquare;'
-makeVectorPtr'WorldConstructionSquare'
+makeStdVectorPtr'WorldConstructionSquare'
 
 -- world_construction.h
 
 --- TODO
 ffi.cdef'typedef struct WorldConstruction WorldConstruction;'
-makeVectorPtr'WorldConstruction'
+makeStdVectorPtr'WorldConstruction'
 
 -- entity_claim_mask.h
 
 ffi.cdef[[
 typedef uint8_t EntityClaimMaskMapRegionMask[16][16];
 ]]
-makeVectorPtr'EntityClaimMaskMapRegionMask'
+makeStdVectorPtr'EntityClaimMaskMapRegionMask'
 
 ffi.cdef[[
 typedef struct {
@@ -2779,101 +3150,83 @@ typedef struct {
 } EntityClaimMask;
 ]]
 
--- world_site.h
-
---- TODO
-ffi.cdef'typedef struct WorldSite WorldSite;'
-makeVectorPtr'WorldSite'
-
 -- world_site_unk130.h
 
 --- TODO
 ffi.cdef'typedef struct WorldSiteUnknown130 WorldSiteUnknown130;'
-makeVectorPtr'WorldSiteUnknown130'
+makeStdVectorPtr'WorldSiteUnknown130'
 
 -- resource_allotment_data.h
 
 --- TODO
 ffi.cdef'typedef struct ResourceAllotmentData ResourceAllotmentData;'
-makeVectorPtr'ResourceAllotmentData'
+makeStdVectorPtr'ResourceAllotmentData'
 
 -- breed.h
 
 --- TODO
 ffi.cdef'typedef struct Breed Breed;'
-makeVectorPtr'Breed'
+makeStdVectorPtr'Breed'
 
 -- battlefield.h
 
 --- TODO
 ffi.cdef'typedef struct Battlefield Battlefield;'
-makeVectorPtr'Battlefield'
+makeStdVectorPtr'Battlefield'
 
 -- region_weather.h
 
 --- TODO
 ffi.cdef'typedef struct RegionWeather RegionWeather;'
-makeVectorPtr'RegionWeather'
+makeStdVectorPtr'RegionWeather'
 
 -- world_object_data.h
 
 --- TODO
 ffi.cdef'typedef struct WorldObjectData WorldObjectData;'
-makeVectorPtr'WorldObjectData'
+makeStdVectorPtr'WorldObjectData'
 
 -- world_landmass.h
 
 --- TODO
 ffi.cdef'typedef struct WorldLandMass WorldLandMass;'
-makeVectorPtr'WorldLandMass'
-
--- world_region.h
-
---- TODO
-ffi.cdef'typedef struct WorldRegion WorldRegion;'
-makeVectorPtr'WorldRegion'
-
--- world_underground_region.h
-
---- TODO
-ffi.cdef'typedef struct WorldUndergroundRegion WorldUndergroundRegion;'
-makeVectorPtr'WorldUndergroundRegion'
+makeStdVectorPtr'WorldLandMass'
 
 -- world_geo_biome.h
 
 --- TODO
 ffi.cdef'typedef struct WorldGeoBiome WorldGeoBiome;'
-makeVectorPtr'WorldGeoBiome'
+makeStdVectorPtr'WorldGeoBiome'
 
 -- world_mountain_peak.h
 
 --- TODO
 ffi.cdef'typedef struct WorldMountainPeak WorldMountainPeak;'
-makeVectorPtr'WorldMountainPeak'
+makeStdVectorPtr'WorldMountainPeak'
 
 -- world_river.h
 
 --- TODO
 ffi.cdef'typedef struct WorldRiver WorldRiver;'
-makeVectorPtr'WorldRiver'
+makeStdVectorPtr'WorldRiver'
 
 -- region_map_entry.h
 
 --- TODO
 ffi.cdef'typedef struct RegionMapEntry RegionMapEntry;'
-makeVectorPtr'RegionMapEntry'
+makeStdVectorPtr'RegionMapEntry'
 
 -- embark_note.h
 
 --- TODO
 ffi.cdef'typedef struct EmbarkNote EmbarkNote;'
-makeVectorPtr'EmbarkNote'
+makeStdVectorPtr'EmbarkNote'
 
 -- feature_init.h
 
 --- TODO
 ffi.cdef'typedef struct FeatureInit FeatureInit;'
-makeVectorPtr'FeatureInit'
+makeStdVectorPtr'FeatureInit'
 
 -- world_geo_layer.h
 
@@ -2884,13 +3237,13 @@ ffi.cdef'typedef struct WorldGeoLayer WorldGeoLayer;'
 
 --- TODO
 ffi.cdef'typedef struct EntityRaw EntityRaw;'
-makeVectorPtr'EntityRaw'
+makeStdVectorPtr'EntityRaw'
 
 -- abstract_building.h
 
 --- TODO
 ffi.cdef'typedef struct AbstractBuilding AbstractBuilding;'
-makeVectorPtr'AbstractBuilding'
+makeStdVectorPtr'AbstractBuilding'
 
 -- flow_reuse_pool.h
 
@@ -2905,54 +3258,146 @@ typedef struct {
 
 --- TODO
 ffi.cdef'typedef struct MaterialTemplate MaterialTemplate;'
-makeVectorPtr'MaterialTemplate'
+makeStdVectorPtr'MaterialTemplate'
 
 -- inorganic_raw.h
 
 --- TODO
 ffi.cdef'typedef struct InorganicRaw InorganicRaw;'
-makeVectorPtr'InorganicRaw'
+makeStdVectorPtr'InorganicRaw'
 
 -- plant_raw.h
 
 --- TODO
 ffi.cdef'typedef struct PlantRaw PlantRaw;'
-makeVectorPtr'PlantRaw'
+makeStdVectorPtr'PlantRaw'
 
 -- tissue_template.h
 
 --- TODO
 ffi.cdef'typedef struct TissueTemplate TissueTemplate;'
-makeVectorPtr'TissueTemplate'
+makeStdVectorPtr'TissueTemplate'
 
 -- body_detail_plan.h
 
 --- TODO
 ffi.cdef'typedef struct BodyDetailPlan BodyDetailPlan;'
-makeVectorPtr'BodyDetailPlan'
+makeStdVectorPtr'BodyDetailPlan'
 
 -- body_template.h
 
 --- TODO
 ffi.cdef'typedef struct BodyTemplate BodyTemplate;'
-makeVectorPtr'BodyTemplate'
+makeStdVectorPtr'BodyTemplate'
 
 -- creature_variation.h
 
 --- TODO
 ffi.cdef'typedef struct CreatureVariation CreatureVariation;'
-makeVectorPtr'CreatureVariation'
+makeStdVectorPtr'CreatureVariation'
+
+-- creature_graphics_appointment.h
+
+--- TODO
+ffi.cdef'typedef struct CreatureGraphicsAppointment CreatureGraphicsAppointment;'
+makeStdVectorPtr'CreatureGraphicsAppointment'
+
+
+-- caste_raw.h
+
+--- TODO
+ffi.cdef'typedef struct CasteRaw CasteRaw;'
+makeStdVectorPtr'CasteRaw'
+
+-- material.h
+
+-- TODO
+ffi.cdef'typedef struct Material Material;'
+makeStdVectorPtr'Material'
+
+-- tissue.h
+
+-- TODO
+ffi.cdef'typedef struct Tissue Tissue;'
+makeStdVectorPtr'Tissue'
 
 -- creature_raw.h
 
 --- TODO
-ffi.cdef'typedef struct CreatureRaw CreatureRaw;'
-makeVectorPtr'CreatureRaw'
+ffi.cdef[[
+typedef struct CreatureRaw {
+	std_string creatureID;
+	std_string name[3];
+	std_string general_baby_name[2];
+	std_string general_child_name[2];
+	std_string unk_v43_1; /*!< since v0.43.01 */
+	uint8_t creature_tile;
+	uint8_t creature_soldier_tile;
+	uint8_t alttile;
+	uint8_t soldier_alttile;
+	uint8_t glowtile;
+	uint16_t temperature1;
+	uint16_t temperature2;
+	int16_t frequency;
+	int16_t population_number[2];
+	int16_t cluster_number[2];
+	int16_t triggerable_group[2];
+	int16_t color[3];
+	int16_t glowcolor[3];
+	int32_t adultsize;
+	vector_string_ptr prefstring;
+	vector_int16 sphere;
+	vector_CasteRaw_ptr caste;
+	vector_int32 pop_ratio;
+	DFBitArray flags;
+	struct {
+		int32_t texpos[6];
+		int32_t texposGs[6];
+		int32_t entityLinkTexpos[6][18];
+		int32_t entityLinkTexposGs[6][18];
+		int32_t siteLinkTexpos[6][10];
+		int32_t siteLinkTexposGs[6][10];
+		int32_t professionTexpos[6][Num_Profession];
+		int32_t professionTexposGs[6][Num_Profession];
+		bool add_color[6];
+		bool entityLink_add_color[6][18];
+		bool siteLink_add_color[6][10];
+		bool profession_add_color[6][Num_Profession];
+		vector_CreatureGraphicsAppointment_ptr appointments;
+	} graphics;
+	vector_int8 speech1;
+	vector_int32 speech2;
+	vector_ptr speech3;
+	vector_Material_ptr material;
+	vector_Tissue_ptr tissue;
+	struct {
+		std_string singular[Num_Profession];
+		std_string plural[Num_Profession];
+	} profession_name;
+	int32_t underground_layer_min;
+	int32_t underground_layer_max;
+	vector_int32 modifier_class;
+	vector_int32 modifier_num_patterns; /*!< for color modifiers, == number of items in their pattern_* vectors */
+	struct {
+		vector_int32 number;
+		vector_int32 time;
+		vector_ItemType item_type;
+		vector_int16 item_subtype;
+		MaterialVecRef material;
+		vector_string_ptr tmpstr[5];
+	} hive_product;
+	int32_t source_hfid;
+	int32_t unk_v4201_1; /*!< since v0.42.01 */
+	int32_t next_modifierID;
+	vector_string_ptr raws;
+} CreatureRaw;
+]]
+makeStdVectorPtr'CreatureRaw'
 
 -- creature_handler.h
 
 ffi.cdef[[
-typedef struct {
+typedef struct CreatureHandler {
 	void * table /* TODO */;
 	vector_CreatureRaw_ptr alphabetic;
 	vector_CreatureRaw_ptr all;
@@ -2984,80 +3429,74 @@ ItemDef_pantsst
 ItemDef_foodst
 ]]):gmatch'[%w_]+' do
 	ffi.cdef('typedef struct '..T..' '..T..';')
-	makeVectorPtr(T)
+	makeStdVectorPtr(T)
 end
-
--- material.h
-
--- TODO
-ffi.cdef'typedef struct Material Material;'
-makeVectorPtr'Material'
 
 -- descriptor_color.h
 
 -- TODO
 ffi.cdef'typedef struct DescriptorColor DescriptorColor;'
-makeVectorPtr'DescriptorColor'
+makeStdVectorPtr'DescriptorColor'
 
 -- descriptor_shape.h
 
 -- TODO
 ffi.cdef'typedef struct DescriptorShape DescriptorShape;'
-makeVectorPtr'DescriptorShape'
+makeStdVectorPtr'DescriptorShape'
 
 -- descriptor_pattern.h
 
 -- TODO
 ffi.cdef'typedef struct DescriptorPattern DescriptorPattern;'
-makeVectorPtr'DescriptorPattern'
+makeStdVectorPtr'DescriptorPattern'
 
 -- reaction.h
 
 -- TODO
 ffi.cdef'typedef struct Reaction Reaction;'
-makeVectorPtr'Reaction'
+makeStdVectorPtr'Reaction'
 
 -- reaction_category.h
 
 -- TODO
 ffi.cdef'typedef struct ReactionCategory ReactionCategory;'
-makeVectorPtr'ReactionCategory'
+makeStdVectorPtr'ReactionCategory'
 
 -- building_def.h
 
 -- TODO
 ffi.cdef'typedef struct BuildingDef BuildingDef;'
-makeVectorPtr'BuildingDef'
+makeStdVectorPtr'BuildingDef'
 
 -- building_def_workshopst.h
 
 -- TODO
 ffi.cdef'typedef struct BuildingDefWorkshopst BuildingDefWorkshopst;'
-makeVectorPtr'BuildingDefWorkshopst'
+makeStdVectorPtr'BuildingDefWorkshopst'
 
 -- building_def_furnacest.h
 
 -- TODO
 ffi.cdef'typedef struct BuildingDefFurnacest BuildingDefFurnacest;'
-makeVectorPtr'BuildingDefFurnacest'
+makeStdVectorPtr'BuildingDefFurnacest'
 
 -- interaction.h
 
 -- TODO
 ffi.cdef'typedef struct Interaction Interaction;'
-makeVectorPtr'Interaction'
+makeStdVectorPtr'Interaction'
 
 -- syndrome.h
 
 -- TODO
 ffi.cdef'typedef struct Syndrome Syndrome;'
-makeVectorPtr'Syndrome'
+makeStdVectorPtr'Syndrome'
 
 -- creature_interaction_effect.h
 
 -- TODO
 ffi.cdef'typedef struct CreatureInteractionEffect CreatureInteractionEffect;'
-makeVectorPtr'CreatureInteractionEffect'
+makeStdVectorPtr'CreatureInteractionEffect'
 
 
 -- world_raws.h
@@ -3071,7 +3510,7 @@ typedef struct {
 	std_string new_plural;
 } WorldRawsBodyGlosses;
 ]]
-makeVectorPtr'WorldRawsBodyGlosses'
+makeStdVectorPtr'WorldRawsBodyGlosses'
 
 ffi.cdef[[
 typedef struct {
@@ -3139,7 +3578,7 @@ typedef struct {
 		vector_BuildingDef_ptr all;
 		vector_BuildingDefWorkshopst_ptr workshops;
 		vector_BuildingDefFurnacest_ptr furnaces;
-		int32_t next_id;
+		int32_t nextID;
 	} buildings;
 
 	vector_Interaction_ptr interactions; /*!< since v0.34.01 */
@@ -3152,7 +3591,7 @@ typedef struct {
 	} matTable;
 
 	struct {
-		// first two fields match MaterialVecRef
+		/* first two fields match MaterialVecRef*/
 		vector_int16 matTypes;
 		vector_int32 matIndexes;
 		vector_int32 interactions;
@@ -3160,8 +3599,8 @@ typedef struct {
 	} syndromes;
 	
 	struct {
-		// first two fields match MaterialVecRef
-		// first three fields matches syndromes
+		/* first two fields match MaterialVecRef*/
+		/* first three fields matches syndromes*/
 		vector_int16 matTypes;
 		vector_int32 matIndexes;
 		vector_int32 interactions;
@@ -3182,10 +3621,10 @@ typedef struct {
 ffi.cdef[[
 typedef int16_t FlipLatitude;
 enum {
-	FlipLatitude_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
-	FlipLatitude_North, // 0, 0x0
-	FlipLatitude_South, // 1, 0x1
-	FlipLatitude_Both, // 2, 0x2
+	FlipLatitude_None = -1, /* -1, 0xFFFFFFFFFFFFFFFF*/
+	FlipLatitude_North, /* 0, 0x0*/
+	FlipLatitude_South, /* 1, 0x1*/
+	FlipLatitude_Both, /* 2, 0x2*/
 };
 ]]
 
@@ -3196,7 +3635,7 @@ typedef struct {
 	int32_t unk_8;
 } WorldDataUnknown274Unknown10;
 ]]
-makeVectorPtr'WorldDataUnknown274Unknown10'
+makeStdVectorPtr'WorldDataUnknown274Unknown10'
 
 ffi.cdef[[
 typedef struct {
@@ -3209,17 +3648,17 @@ typedef struct {
 	int32_t unk_30;
 } WorldDataUnknown274;
 ]]
-makeVectorPtr'WorldDataUnknown274'
+makeStdVectorPtr'WorldDataUnknown274'
 
 ffi.cdef[[
 typedef struct {
 	LanguageName name; /*!< name of the world */
 	int8_t unk1[15];
-	int32_t next_site_id;
-	int32_t next_site_unk130_id;
-	int32_t next_resource_allotment_id;
-	int32_t next_breed_id;
-	int32_t next_battlefield_id; /*!< since v0.34.01 */
+	int32_t next_siteID;
+	int32_t next_site_unk130ID;
+	int32_t next_resource_allotmentID;
+	int32_t next_breedID;
+	int32_t next_battlefieldID; /*!< since v0.34.01 */
 	int32_t unk_v34_1; /*!< since v0.34.01 */
 	int32_t world_width;
 	int32_t world_height;
@@ -3336,185 +3775,59 @@ typedef struct {
 } WorldData;
 ]]
 
--- save_version.h
-
-ffi.cdef[[
-typedef int32_t SaveVersion;
-enum {
-	SaveVersion_v0_21_93_19a = 1107, // 1107, 0x453
-	SaveVersion_v0_21_93_19c = 1108, // 1108, 0x454
-	SaveVersion_v0_21_95_19a = 1108, // 1108, 0x454
-	SaveVersion_v0_21_95_19b = 1108, // 1108, 0x454
-	SaveVersion_v0_21_95_19c = 1110, // 1110, 0x456
-	SaveVersion_v0_21_104_19d = 1121, // 1121, 0x461
-	SaveVersion_v0_21_104_21a = 1123, // 1123, 0x463
-	SaveVersion_v0_21_104_21b = 1125, // 1125, 0x465
-	SaveVersion_v0_21_105_21a = 1128, // 1128, 0x468
-	SaveVersion_v0_22_107_21a = 1128, // 1128, 0x468
-	SaveVersion_v0_22_110_22e = 1134, // 1134, 0x46E
-	SaveVersion_v0_22_110_22f = 1137, // 1137, 0x471
-	SaveVersion_v0_22_110_23a = 1148, // 1148, 0x47C
-	SaveVersion_v0_22_120_23a = 1151, // 1151, 0x47F
-	SaveVersion_v0_22_121_23b = 1161, // 1161, 0x489
-	SaveVersion_v0_22_123_23a = 1165, // 1165, 0x48D
-	SaveVersion_v0_23_130_23a = 1169, // 1169, 0x491
-	SaveVersion_v0_27_169_32a = 1205, // 1205, 0x4B5
-	SaveVersion_v0_27_169_33a = 1206, // 1206, 0x4B6
-	SaveVersion_v0_27_169_33b = 1209, // 1209, 0x4B9
-	SaveVersion_v0_27_169_33c = 1211, // 1211, 0x4BB
-	SaveVersion_v0_27_169_33d = 1212, // 1212, 0x4BC
-	SaveVersion_v0_28_181_39b = 1255, // 1255, 0x4E7
-	SaveVersion_v0_28_181_39c = 1256, // 1256, 0x4E8
-	SaveVersion_v0_28_181_39d = 1259, // 1259, 0x4EB
-	SaveVersion_v0_28_181_39e = 1260, // 1260, 0x4EC
-	SaveVersion_v0_28_181_39f = 1261, // 1261, 0x4ED
-	SaveVersion_v0_28_181_40a = 1265, // 1265, 0x4F1
-	SaveVersion_v0_28_181_40b = 1266, // 1266, 0x4F2
-	SaveVersion_v0_28_181_40c = 1267, // 1267, 0x4F3
-	SaveVersion_v0_28_181_40d = 1268, // 1268, 0x4F4
-	SaveVersion_v0_31_01 = 1287, // 1287, 0x507
-	SaveVersion_v0_31_02 = 1288, // 1288, 0x508
-	SaveVersion_v0_31_03 = 1289, // 1289, 0x509
-	SaveVersion_v0_31_04 = 1292, // 1292, 0x50C
-	SaveVersion_v0_31_05 = 1295, // 1295, 0x50F
-	SaveVersion_v0_31_06 = 1297, // 1297, 0x511
-	SaveVersion_v0_31_08 = 1300, // 1300, 0x514
-	SaveVersion_v0_31_09 = 1304, // 1304, 0x518
-	SaveVersion_v0_31_10 = 1305, // 1305, 0x519
-	SaveVersion_v0_31_11 = 1310, // 1310, 0x51E
-	SaveVersion_v0_31_12 = 1311, // 1311, 0x51F
-	SaveVersion_v0_31_13 = 1323, // 1323, 0x52B
-	SaveVersion_v0_31_14 = 1325, // 1325, 0x52D
-	SaveVersion_v0_31_15 = 1326, // 1326, 0x52E
-	SaveVersion_v0_31_16 = 1327, // 1327, 0x52F
-	SaveVersion_v0_31_17 = 1340, // 1340, 0x53C
-	SaveVersion_v0_31_18 = 1341, // 1341, 0x53D
-	SaveVersion_v0_31_19 = 1351, // 1351, 0x547
-	SaveVersion_v0_31_20 = 1353, // 1353, 0x549
-	SaveVersion_v0_31_21 = 1354, // 1354, 0x54A
-	SaveVersion_v0_31_22 = 1359, // 1359, 0x54F
-	SaveVersion_v0_31_23 = 1360, // 1360, 0x550
-	SaveVersion_v0_31_24 = 1361, // 1361, 0x551
-	SaveVersion_v0_31_25 = 1362, // 1362, 0x552
-	SaveVersion_v0_34_01 = 1372, // 1372, 0x55C
-	SaveVersion_v0_34_02 = 1374, // 1374, 0x55E
-	SaveVersion_v0_34_03 = 1376, // 1376, 0x560
-	SaveVersion_v0_34_04 = 1377, // 1377, 0x561
-	SaveVersion_v0_34_05 = 1378, // 1378, 0x562
-	SaveVersion_v0_34_06 = 1382, // 1382, 0x566
-	SaveVersion_v0_34_07 = 1383, // 1383, 0x567
-	SaveVersion_v0_34_08 = 1400, // 1400, 0x578
-	SaveVersion_v0_34_09 = 1402, // 1402, 0x57A
-	SaveVersion_v0_34_10 = 1403, // 1403, 0x57B
-	SaveVersion_v0_34_11 = 1404, // 1404, 0x57C
-	SaveVersion_v0_40_01 = 1441, // 1441, 0x5A1
-	SaveVersion_v0_40_02 = 1442, // 1442, 0x5A2
-	SaveVersion_v0_40_03 = 1443, // 1443, 0x5A3
-	SaveVersion_v0_40_04 = 1444, // 1444, 0x5A4
-	SaveVersion_v0_40_05 = 1445, // 1445, 0x5A5
-	SaveVersion_v0_40_06 = 1446, // 1446, 0x5A6
-	SaveVersion_v0_40_07 = 1448, // 1448, 0x5A8
-	SaveVersion_v0_40_08 = 1449, // 1449, 0x5A9
-	SaveVersion_v0_40_09 = 1451, // 1451, 0x5AB
-	SaveVersion_v0_40_10 = 1452, // 1452, 0x5AC
-	SaveVersion_v0_40_11 = 1456, // 1456, 0x5B0
-	SaveVersion_v0_40_12 = 1459, // 1459, 0x5B3
-	SaveVersion_v0_40_13 = 1462, // 1462, 0x5B6
-	SaveVersion_v0_40_14 = 1469, // 1469, 0x5BD
-	SaveVersion_v0_40_15 = 1470, // 1470, 0x5BE
-	SaveVersion_v0_40_16 = 1471, // 1471, 0x5BF
-	SaveVersion_v0_40_17 = 1472, // 1472, 0x5C0
-	SaveVersion_v0_40_18 = 1473, // 1473, 0x5C1
-	SaveVersion_v0_40_19 = 1474, // 1474, 0x5C2
-	SaveVersion_v0_40_20 = 1477, // 1477, 0x5C5
-	SaveVersion_v0_40_21 = 1478, // 1478, 0x5C6
-	SaveVersion_v0_40_22 = 1479, // 1479, 0x5C7
-	SaveVersion_v0_40_23 = 1480, // 1480, 0x5C8
-	SaveVersion_v0_40_24 = 1481, // 1481, 0x5C9
-	SaveVersion_v0_42_01 = 1531, // 1531, 0x5FB
-	SaveVersion_v0_42_02 = 1532, // 1532, 0x5FC
-	SaveVersion_v0_42_03 = 1533, // 1533, 0x5FD
-	SaveVersion_v0_42_04 = 1534, // 1534, 0x5FE
-	SaveVersion_v0_42_05 = 1537, // 1537, 0x601
-	SaveVersion_v0_42_06 = 1542, // 1542, 0x606
-	SaveVersion_v0_43_01 = 1551, // 1551, 0x60F
-	SaveVersion_v0_43_02 = 1552, // 1552, 0x610
-	SaveVersion_v0_43_03 = 1553, // 1553, 0x611
-	SaveVersion_v0_43_04 = 1555, // 1555, 0x613
-	SaveVersion_v0_43_05 = 1556, // 1556, 0x614
-	SaveVersion_v0_44_01 = 1596, // 1596, 0x63C
-	SaveVersion_v0_44_02 = 1597, // 1597, 0x63D
-	SaveVersion_v0_44_03 = 1600, // 1600, 0x640
-	SaveVersion_v0_44_04 = 1603, // 1603, 0x643
-	SaveVersion_v0_44_05 = 1604, // 1604, 0x644
-	SaveVersion_v0_44_06 = 1611, // 1611, 0x64B
-	SaveVersion_v0_44_07 = 1612, // 1612, 0x64C
-	SaveVersion_v0_44_08 = 1613, // 1613, 0x64D
-	SaveVersion_v0_44_09 = 1614, // 1614, 0x64E
-	SaveVersion_v0_44_10 = 1620, // 1620, 0x654
-	SaveVersion_v0_44_11 = 1623, // 1623, 0x657
-	SaveVersion_v0_44_12 = 1625, // 1625, 0x659
-	SaveVersion_v0_47_01 = 1710, // 1710, 0x6AE
-	SaveVersion_v0_47_02 = 1711, // 1711, 0x6AF
-	SaveVersion_v0_47_03 = 1713, // 1713, 0x6B1
-	SaveVersion_v0_47_04 = 1715, // 1715, 0x6B3
-	SaveVersion_v0_47_05 = 1716, // 1716, 0x6B4
-};
-]]
-
 -- history_event.h
 
 -- TODO
 ffi.cdef'typedef struct HistoryEvent HistoryEvent;'
-makeVectorPtr'HistoryEvent'
+makeStdVectorPtr'HistoryEvent'
 
 -- relationship_event.h
 
 -- TODO
 ffi.cdef'typedef struct RelationshipEvent RelationshipEvent;'
-makeVectorPtr'RelationshipEvent'
+makeStdVectorPtr'RelationshipEvent'
 
 -- relationship_event_supplement.h
 
 -- TODO
 ffi.cdef'typedef struct RelationshipEventSupplement RelationshipEventSupplement;'
-makeVectorPtr'RelationshipEventSupplement'
+makeStdVectorPtr'RelationshipEventSupplement'
 
 -- history_event_collection.h
 
 -- TODO
 ffi.cdef'typedef struct HistoryEventCollection HistoryEventCollection;'
-makeVectorPtr'HistoryEventCollection'
+makeStdVectorPtr'HistoryEventCollection'
 
 -- history_era.h
 
 -- TODO
 ffi.cdef'typedef struct HistoryEra HistoryEra;'
-makeVectorPtr'HistoryEra'
+makeStdVectorPtr'HistoryEra'
 
 -- intrigue.h
 
 -- TODO
 ffi.cdef'typedef struct Intrigue Intrigue;'
-makeVectorPtr'Intrigue'
+makeStdVectorPtr'Intrigue'
 
 -- entity_population.h
 
 -- TODO
 ffi.cdef'typedef struct EntityPopulation EntityPopulation;'
-makeVectorPtr'EntityPopulation'
+makeStdVectorPtr'EntityPopulation'
 
 -- flow_info.h
 
 -- TODO
 ffi.cdef'typedef struct FlowInfo FlowInfo;'
-makeVectorPtr'FlowInfo'
+makeStdVectorPtr'FlowInfo'
 
 -- interaction_effect.h
 
 -- TODO
 ffi.cdef'typedef struct InteractionEffect InteractionEffect;'
-makeVectorPtr'InteractionEffect'
+makeStdVectorPtr'InteractionEffect'
 
 
 -- world_history.h
@@ -3698,22 +4011,22 @@ typedef struct {
 -- engraving.h
 
 ffi.cdef'typedef struct Engraving Engraving;'
-makeVectorPtr'Engraving'
+makeStdVectorPtr'Engraving'
 
 -- campfire.h
 
 ffi.cdef'typedef struct Campfire Campfire;'
-makeVectorPtr'Campfire'
+makeStdVectorPtr'Campfire'
 
 -- web_cluster.h
 
 ffi.cdef'typedef struct WebCluster WebCluster;'
-makeVectorPtr'WebCluster'
+makeStdVectorPtr'WebCluster'
 
 -- fire.h
 
 ffi.cdef'typedef struct Fire Fire;'
-makeVectorPtr'Fire'
+makeStdVectorPtr'Fire'
 
 
 -- world.h
@@ -3885,7 +4198,7 @@ Building_instrumentst
 Building_offering_placest
 ]]):gmatch'[%w_]+' do
 	ffi.cdef('typedef struct '..T..' '..T..';')
-	makeVectorPtr(T)
+	makeStdVectorPtr(T)
 end
 
 ffi.cdef[[
@@ -3912,7 +4225,7 @@ typedef struct {
 	vector_int32 grasses;
 } WorldLayerGrasses;
 ]]
-makeVectorPtr'WorldLayerGrasses'
+makeStdVectorPtr'WorldLayerGrasses'
 
 ffi.cdef[[
 typedef struct {
@@ -3934,7 +4247,7 @@ typedef struct {
 	int32_t unk_16;
 } WorldUnknown131ec0;
 ]]
-makeVectorPtr'WorldUnknown131ec0'
+makeStdVectorPtr'WorldUnknown131ec0'
 
 ffi.cdef[[
 typedef struct {
@@ -3943,7 +4256,7 @@ typedef struct {
 	int32_t unknown2;
 } WorldLanguages;
 ]]
-makeVectorPtr'WorldLanguages'
+makeStdVectorPtr'WorldLanguages'
 
 ffi.cdef[[
 typedef struct {
@@ -3954,7 +4267,7 @@ typedef struct {
 	int32_t unk_2; /*!< only seen -1 */
 } World_Unknown131ef0_Claims;
 ]]
-makeVectorPtr'World_Unknown131ef0_Claims'
+makeStdVectorPtr'World_Unknown131ef0_Claims'
 
 ffi.cdef[[
 typedef struct {
@@ -3965,7 +4278,7 @@ typedef struct {
 	int32_t unk_2; /*!< only seen 0 */
 } WorldUnknown131ef0 ;
 ]]
-makeVectorPtr'WorldUnknown131ef0'
+makeStdVectorPtr'WorldUnknown131ef0'
 
 ffi.cdef[[
 typedef int32_t WorldLoadStage;
@@ -4050,7 +4363,7 @@ typedef struct {
 	bool unk_1;
 } WorldItemTypes;
 ]]
-makeVectorPtr'WorldItemTypes'
+makeStdVectorPtr'WorldItemTypes'
 
 ffi.cdef[[
 typedef struct {
@@ -4062,7 +4375,7 @@ typedef struct {
 	int32_t unk_6;
 } World_Unknown19325c_Unknown1;
 ]]
-makeVectorPtr'World_Unknown19325c_Unknown1'
+makeStdVectorPtr'World_Unknown19325c_Unknown1'
 
 ffi.cdef[[
 typedef struct {
@@ -4071,7 +4384,7 @@ typedef struct {
 	int32_t unk_3;
 } World_Unknown19325c_Unknown2;
 ]]
-makeVectorPtr'World_Unknown19325c_Unknown2'
+makeStdVectorPtr'World_Unknown19325c_Unknown2'
 
 ffi.cdef[[
 typedef struct {
@@ -4081,7 +4394,7 @@ typedef struct {
 	int32_t unk_4;
 } World_Unknown19325c_Unknown3;
 ]]
-makeVectorPtr'World_Unknown19325c_Unknown3'
+makeStdVectorPtr'World_Unknown19325c_Unknown3'
 
 ffi.cdef[[
 typedef struct {
@@ -4746,7 +5059,7 @@ typedef struct {
 	} flowEngine;
 
 	vector_int32 busyBuildings;
-	dfarray_bit caveInFlags;
+	DFBitArray caveInFlags;
 
 	SaveVersion originalSaveVersion;
 	struct {

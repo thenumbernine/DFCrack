@@ -3,7 +3,6 @@ half hearted manually procured file of the globals.
 get rid of this in favor of generated dfcrack/df/globals.lua
 --]]
 require 'dftypes'
-require 'df_mts'
 local ffi = require 'ffi'
 
 local df = {}

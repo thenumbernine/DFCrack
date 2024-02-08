@@ -38,8 +38,19 @@ typedef struct <?=name?> {
 	function mt:size()
 		return self.finish - self.start
 	end
+	
 	function mt:capacity()
 		return self.endOfStorage - self.start
+	end
+	
+	-- safe access
+	function mt:at(i)
+		local ptr = self.start + i
+		if ptr < self.start or ptr >= self.finish then
+			return nil, 'out of bounds' 
+		end
+		-- in C++ this would return a reference ...
+		return ptr
 	end
 
 	function mt:__ipairs()

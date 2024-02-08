@@ -21,6 +21,11 @@ typedef struct df_flagarray {
 
 -- [[ here's the by-hand port of the headers to luajit ...
 local df = require 'mem'
+
+-- require this after doing the declarations in df
+-- since some metatables will go looking in df
+require 'df_mts'
+
 --]]
 --[[ here's me working on the xml->luajit port
 local df = require 'df.globals'
