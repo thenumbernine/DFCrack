@@ -5,7 +5,7 @@ local template = require 'template'
 -- and maybe move that to its own lib, like std-ffi.vector ?
 
 local function makeStdVector(T, name)
-	name = name or 'vector_'..T
+	name = name or 'vector_'..T:gsub('%*', '_ptr'):gsub('%s+', '')
 	-- stl vector in my gcc / linux / df is 24 bytes
 	-- template type of our vector ... 8 bytes mind you
 	local code = template([[

@@ -6,6 +6,9 @@ turns out xml2lua doesn't preserve node order so I'll use my htmlparser which do
 hmm too many edge cases
 maybe I'll just write a filter for the already-generated headers themselves...
 ... nah, I think it's easier to just parse the xml, even tho there are a ton of edge cases for something as simple as just determining the type of a field ...
+
+TODO
+- output lua code using my struct-lua, and filter fields based on version at runtime based on the inferred DF version
 --]]
 
 local path = require 'ext.path'
