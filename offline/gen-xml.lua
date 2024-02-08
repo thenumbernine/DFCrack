@@ -481,7 +481,7 @@ function Emitter:makeTypeNode(
 				self.outStmts:insert(code)
 				self.outStmts:insert']]'
 			end
-			self.outStmts:insert("makeSTLDeque'"..templateType.destName.."'")
+			self.outStmts:insert("require 'std.deque' '"..templateType.destName.."'")
 			
 			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
@@ -498,7 +498,7 @@ function Emitter:makeTypeNode(
 				self.outStmts:insert(code)
 				self.outStmts:insert']]'
 			end
-			self.outStmts:insert("makeSTLVector'"..templateType.destName.."'")
+			self.outStmts:insert("require 'std.vector' '"..templateType.destName.."'")
 
 			return STLVectorType(templateType)
 		elseif fieldtag == 'df-flagarray' then
