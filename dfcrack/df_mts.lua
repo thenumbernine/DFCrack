@@ -92,34 +92,32 @@ do
 			or self.ghostly ~= 0
 	end
 
-	function mt:casteFlagSet(flag, race, caste)
--- TODO segfaulting
---do return false end		
-		assert(flag ~= nil)
+	function mt:casteFlagSet(flagIndex, race, caste)
+		assert(flagIndex ~= nil)
 		race = race or self.race
 		caste = caste or self.caste
-print('CreatureRaw:casteFlagSet', flag, race, caste)
+--print('CreatureRaw:casteFlagSet', flagIndex, race, caste)
 	
 		local creature = df.CreatureRaw.find(race);
 		-- 'creature' is df.world[0].raws.creatures.all[] vector entry, which is a CreatureRaw*
 		-- need explicit nil test to detect null pointer cdata
-print('creature', creature)
+--print('creature', creature)
 		if creature == nil then return false end
-print('creature[0]', creature[0])
+--print('creature[0]', creature[0])
 		-- i.g. sometimes they can be nil ?
 		if creature[0] == nil then return false end
 
-print('creature caste', creature.caste)
+--print('creature caste', creature.caste)
 		-- this is crashing ...
 		local craw = creature.caste:at(caste)
-print'craw'
-print('craw', craw)
+--print'craw'
+--print('craw', craw)
 		if craw == nil then return false end
-print('craw[0]', craw[0])
+--print('craw[0]', craw[0])
 		if craw[0] == nil then return false end
 
-print('craw flags', craw[0].flags)
-		return bit.band(craw[0].flags, flag) ~= 0
+--print('craw flags', craw[0].flags)
+		return craw[0].flags:isSet(flagIndex)
 	end
 
 	function mt:isCitizen(ignoreSanity)

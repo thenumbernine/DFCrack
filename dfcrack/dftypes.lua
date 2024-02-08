@@ -68,7 +68,7 @@ makeDfArray'short'
 
 -- except that its indexes and size are >>3
 -- BitArray
-makeDfArray('uint8_t', 'DFBitArray', 'uint32_t')
+local DFBitArray = require 'dfbitarray'
 
 -- fwd decls:
 
