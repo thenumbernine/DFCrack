@@ -1,3 +1,7 @@
+--[[
+half hearted manually procured file of the globals.
+get rid of this in favor of generated dfcrack/df/*.lua
+--]]
 local ffi = require 'ffi'
 local template = require 'template'
 
@@ -11,8 +15,8 @@ typedef vec3s_t short3_t;
 typedef vec3i_t int3_t;
 ]]
 
-require 'std_string'
-local makeStdVector = require 'std_vector'
+require 'std.string'
+local makeStdVector = require 'std.vector'
 local makeList = require 'list'
 local makeDfArray = require 'dfarray'
 

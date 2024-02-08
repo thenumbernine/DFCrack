@@ -1,5 +1,6 @@
 --[[
-put your custom metatable code here
+put your custom metatable code here.
+TODO put this in its own folder somewhere, like dfcrack/mt/
 --]]
 local ffi = require 'ffi'
 
@@ -52,7 +53,7 @@ do
 
 	function mt:isOpposedToLife()
 		if self.curse.removeTags1.OPPOSED_TO_LIFE ~= 0 then return false end
-		if self.curse.addTags1.bits.OPPOSED_TO_LIFE ~= 0 then return true end
+		if self.curse.addTags1.OPPOSED_TO_LIFE ~= 0 then return true end
 		return self:casteFlagSet(CasteRawFlags_OPPOSED_TO_LIFE)
 	end
 

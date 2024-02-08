@@ -19,10 +19,10 @@ typedef struct df_flagarray {
 ]]
 --]]
 
---[[ here's the by-hand port of the headers to luajit ...
+-- [[ here's the by-hand port of the headers to luajit ...
 local df = require 'mem'
 --]]
--- [[ here's me working on the xml->luajit port
+--[[ here's me working on the xml->luajit port
 local df = require 'df.globals'
 --]]
 
