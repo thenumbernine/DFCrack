@@ -374,15 +374,18 @@ function Emitter:getTypeFromAttrOrChildren(
 			)
 		end
 
+		local structType = self:makeStructType(
+			namespace:concat'_'..makeTypeName(baseFieldName or '')	-- struct name
+		)
+
 		-- implicit inline struct
-		return self:buildStructType(
+		local code = self:buildStructType(
 			node,
-			
-			-- name ... dest name or source name?
-			namespace:concat'_'..makeTypeName(baseFieldName or ''),	-- struct name
-			
+			structType,
 			namespace
 		)
+		
+		return structType, code
 	end
 
 	-- no type
@@ -441,10 +444,12 @@ function Emitter:makeTypeNode(
 			else
 				assert(fieldnode.child, "found a compound without a type and without children...")
 
-				structType, fieldTypeStr = self:buildStructType(
+				local structType = AnonStructType()
+				fieldTypeStr = self:buildStructType(
 					fieldnode,
 					
-					nil, -- no name = no trailing ;, anonymous inline struct
+					-- no name = no trailing ;, anonymous inline struct
+					structType, 
 					
 					namespace
 				)
@@ -556,7 +561,15 @@ end
 --[[
 call this to make a struct Type before passing it on to the buildStructType
 --]]
-function Emitter:makeStructType(structName)
+function Emitter:makeStructType(structDestName)
+	for suffix=0,math.huge do
+		-- keep building structTypes until we find one that's not used
+		-- this should  be fine so long as the Type ctor doesn't write to any external places 
+		local structType = Type(nil, structDestName..(suffix == 0 and '' or suffix))
+		if not self.localStructNames[structType.destName] then 
+			return structType
+		end
+	end
 end
 
 --[[
@@ -568,35 +581,20 @@ typesUsed = used for recording require()'s
 --]]
 function Emitter:buildStructType(
 	structNode,
-	
-	-- TODO this is already processed through makeTypeName()
-	-- but Type will also do this ...
-	-- so maybe I should be passing a Type here instead
-	-- and one whose destName is already procured
-	structName,
-	
+	structType,
 	namespace
 )
-	local structType
-	if structName then
-		for suffix=0,math.huge do
-			-- keep building structTypes until we find one that's not used
-			-- this should  be fine so long as the Type ctor doesn't write to any external places 
-			structType = Type(nil, structName..(suffix == 0 and '' or suffix))
-			if not self.localStructNames[structType.destName] then break end
-		end
-	else
-		-- I think even nested structs will need name in LuaJIT
-		--error("what to call this struct")
-		structType = AnonStructType()
-	end
-
+	local structName = structType.destName
+	if structName == '' then structName = nil end
+	
 	return select(2, assert(xpcall(function()
+
 		local out = table()
 
 		local parentType = htmlcommon.findattr(structNode, 'inherits-from')
 		if not structNode.child then
 			assert(parentType)
+			assert(structName)
 			parentType = makeTypeName(parentType)
 			out:insert('typedef '..parentType..' '..structName..';')
 		else
@@ -682,7 +680,7 @@ function Emitter:buildStructType(
 			out:insert('} '..(structName and structName..';' or ''))
 		end
 
-		return structType, out:concat'\n'
+		return out:concat'\n'
 	end, function(err)
 		return 'for struct '..require 'ext.tolua'(structName)..'\n'
 			..err..'\n'
@@ -747,12 +745,12 @@ function StructEmitter:process(node)
 
 	out:insert"local ffi = require 'ffi'"
 	
-	local structType, code = self:buildStructType(
+	local code = self:buildStructType(
 		-- xml node
 		node,
 		
 		-- struct name to insert into the struct code
-		self.structType.destName,
+		self.structType,
 		
 		-- namespace
 		table{self.structType.destName}	
