@@ -175,16 +175,26 @@ end
 local class = require 'ext.class'
 
 local Type = class()
-function Type:init(name)
-	self.name = assert(name)
 
-	-- string = use mapped value
-	self.destName = reservedTypeNames[self.name]
-	-- true = use reserved word / don't change
-	if self.destName == true then self.destName = self.name end
-	-- nil = change
-	self.destName = self.destName or makeTypeName(self.name)
+function Type:init(name, destName)
+	-- .name = name in the xml file
+	-- not needed except to test for reserved names
+	self.name = name
+
+	if destName then
+		-- optional specify up front the dest name - used by structs
+		self.destName = destName
+	else
+		-- .destName = name in the lua file
+		-- string = use mapped value
+		self.destName = reservedTypeNames[self.name]
+		-- true = use reserved word / don't change
+		if self.destName == true then self.destName = self.name end
+		-- nil = change
+		self.destName = self.destName or makeTypeName(self.name)
+	end
 end
+
 function Type:declare(var)
 	if var then
 		var = snakeToCamelCase(var)
@@ -365,9 +375,12 @@ function Emitter:getTypeFromAttrOrChildren(
 		end
 
 		-- implicit inline struct
-		return self:makeStructNode(
+		return self:buildStructType(
 			node,
+			
+			-- name ... dest name or source name?
 			namespace:concat'_'..makeTypeName(baseFieldName or ''),	-- struct name
+			
 			namespace
 		)
 	end
@@ -428,9 +441,11 @@ function Emitter:makeTypeNode(
 			else
 				assert(fieldnode.child, "found a compound without a type and without children...")
 
-				structType, fieldTypeStr = self:makeStructNode(
+				structType, fieldTypeStr = self:buildStructType(
 					fieldnode,
+					
 					nil, -- no name = no trailing ;, anonymous inline struct
+					
 					namespace
 				)
 				-- insert the anonymous nested struct
@@ -539,20 +554,45 @@ function Emitter:makeTypeNode(
 end
 
 --[[
+call this to make a struct Type before passing it on to the buildStructType
+--]]
+function Emitter:makeStructType(structName)
+end
+
+--[[
 structNode = element in xml dom
 structName = passed into this function, since it may or may not exist
 	but it is usually (always?) defined by structNode's 'name' attr
 namespace = namespace
 typesUsed = used for recording require()'s
 --]]
-function Emitter:makeStructNode(
+function Emitter:buildStructType(
 	structNode,
+	
+	-- TODO this is already processed through makeTypeName()
+	-- but Type will also do this ...
+	-- so maybe I should be passing a Type here instead
+	-- and one whose destName is already procured
 	structName,
+	
 	namespace
 )
-	local out = table()
+	local structType
+	if structName then
+		for suffix=0,math.huge do
+			-- keep building structTypes until we find one that's not used
+			-- this should  be fine so long as the Type ctor doesn't write to any external places 
+			structType = Type(nil, structName..(suffix == 0 and '' or suffix))
+			if not self.localStructNames[structType.destName] then break end
+		end
+	else
+		-- I think even nested structs will need name in LuaJIT
+		--error("what to call this struct")
+		structType = AnonStructType()
+	end
 
-	local result, structType = xpcall(function()
+	return select(2, assert(xpcall(function()
+		local out = table()
 
 		local parentType = htmlcommon.findattr(structNode, 'inherits-from')
 		if not structNode.child then
@@ -624,38 +664,30 @@ function Emitter:makeStructNode(
 								end
 							else
 								-- no struct def -- add type
+								-- but don't add it if it's a locally defined struct
 								fieldType:addTypeUsed(self.typesUsed)
+								for k, _ in pairs(self.localStructNames) do
+									self.typesUsed[k] = nil
+								end
 							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
-
 						end
 					end
 				end
 			end
-			-- ugly hack: leeave the ; off the end if we're going to return this to-be-used for anonymous nested structs with vars
+			-- ugly hack: leave the ; off the end if we're going to return this to-be-used for anonymous nested structs with vars
 			-- TODO if no struct name then we want the caller to insert this struct at the top of the file - no inline structs in luajit ... ? i think?
 			-- more specifically, no vectors-of-anon-structs, nor are there in the generated c++ headers
 			-- but we do want nameless inline structs because that is used for struct/union memory alignment more than anything
 			out:insert('} '..(structName and structName..';' or ''))
 		end
 
+		return structType, out:concat'\n'
 	end, function(err)
-		return 'for struct '..tostring(structName)..'\n'
+		return 'for struct '..require 'ext.tolua'(structName)..'\n'
 			..err..'\n'
 			..debug.traceback()
-	end)
-	if not result then error(structType) end
-
-	local structType
-	if structName then
-		structType = Type(structName)
-	else
-		-- I think even nested structs will need name in LuaJIT
-		--error("what to call this struct")
-		structType = AnonStructType()
-	end
-
-	return structType, out:concat'\n'
+	end)))
 end
 
 
@@ -707,18 +739,23 @@ local StructEmitter = Emitter:subclass()
 
 function StructEmitter:init(args)
 	StructEmitter.super.init(self, args)
-	self.structName = assert(args.structName)
+	self.structType = assert(args.structType)
 end
 
-function StructEmitter:process(ch)
+function StructEmitter:process(node)
 	local out = self.out
 
 	out:insert"local ffi = require 'ffi'"
 	
-	local structType, code = self:makeStructNode(
-		ch,					-- xml node
-		self.structName,			-- struct name to insert into the struct code
-		table{self.structName}	-- namespace
+	local structType, code = self:buildStructType(
+		-- xml node
+		node,
+		
+		-- struct name to insert into the struct code
+		self.structType.destName,
+		
+		-- namespace
+		table{self.structType.destName}	
 	)
 	if string.trim(code) ~= '' then
 		-- need to also keep track of the code's typename
@@ -743,10 +780,10 @@ function BitfieldEmitter:init(args)
 	self.bitfieldName = assert(args.bitfieldName)
 end
 
-function BitfieldEmitter:process(ch)
+function BitfieldEmitter:process(node)
 	local out = self.out
 
-	local basetype = htmlcommon.findattr(ch, 'base-type') or 'uint32_t'
+	local basetype = htmlcommon.findattr(node, 'base-type') or 'uint32_t'
 	
 	out:insert"local ffi = require 'ffi'"
 	out:insert"ffi.cdef[["
@@ -756,7 +793,7 @@ function BitfieldEmitter:process(ch)
 	local totalBitCount = 0
 	local maxBits = bit.lshift(ffi.sizeof(basetype), 3)
 	local anonIndex = 1
-	for _,fieldnode in ipairs(ch.child) do
+	for _,fieldnode in ipairs(node.child) do
 		if fieldnode.type == 'tag' and fieldnode.tag == 'flag-bit' then
 			local fieldName = htmlcommon.findattr(fieldnode, 'name')
 			if fieldName then
@@ -791,12 +828,12 @@ function GlobalEmitter:init(args)
 	self.objDefs = table()
 end
 
-function GlobalEmitter:process(ch)
+function GlobalEmitter:process(node)
 	-- accumulate these
 
 	-- TODO duplicate for struct and class below?
-	local name = htmlcommon.findattr(ch, 'name')
-	local since = htmlcommon.findattr(ch, 'since')
+	local name = htmlcommon.findattr(node, 'name')
+	local since = htmlcommon.findattr(node, 'since')
 	if since then
 		error("haven't got this handled yet") -- cuz no one is using it yet ...
 	end
@@ -817,7 +854,7 @@ function GlobalEmitter:process(ch)
 			-- TODO here read the type just like you would for any other struct-field
 			local globalStructDefs = table()
 			local globalType, code = self:getTypeFromAttrOrChildren(
-				ch,
+				node,
 				table{'Global'},
 				globalTypesUsed,
 				globalStructDefs
@@ -903,17 +940,16 @@ for f in (dfhacksrcdir/'xml'):dir() do
 			elseif ch.tag == 'class-type'
 			or ch.tag == 'struct-type'
 			then
-				local structName = makeTypeName(
-					assert(htmlcommon.findattr(ch, 'type-name'))
-				)
+				local structSrcName = assert(htmlcommon.findattr(ch, 'type-name'))
+				local structType = Type(structSrcName)
+				local structDstName = structType.destName
 
 				local emit = StructEmitter{
-					outpath = (destdir/(structName..'.lua')),
-					structName = structName,
+					outpath = (destdir/(structDstName..'.lua')),
+					structType = structType,
 				}
 				emit:process(ch)
 				emit:write()
-
 			elseif ch.tag == 'bitfield-type' then
 				local bitfieldName = makeTypeName(assert(htmlcommon.findattr(ch, 'type-name')))
 
