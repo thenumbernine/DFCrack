@@ -177,15 +177,14 @@ local class = require 'ext.class'
 local Type = class()
 function Type:init(name)
 	self.name = assert(name)
-	self.destName = self:initDestName()
+
+	-- string = use mapped value
+	self.destName = reservedTypeNames[self.name]
+	-- true = use reserved word / don't change
+	if self.destName == true then self.destName = self.name end
+	-- nil = change
+	self.destName = self.destName or makeTypeName(self.name)
 end
-function Type:initDestName()
-	local res = reservedTypeNames[self.name]
-	if res == true then res = self.name end
-	if res then return res end
-	return makeTypeName(self.name)
-end
-function Type:getBase() return self end
 function Type:declare(var)
 	if var then
 		var = snakeToCamelCase(var)
@@ -193,10 +192,8 @@ function Type:declare(var)
 	return self.destName..' '..(var or '')
 end
 function Type:addTypeUsed(typesUsed)
-	local baseType = self:getBase().name
-	if not baseType then return end
-	if not reservedTypeNames[baseType] then
-		typesUsed[makeTypeName(baseType)] = true
+	if not reservedTypeNames[self.name] then
+		typesUsed[self.destName] = true
 	end
 end
 
@@ -205,11 +202,11 @@ function ArrayType:init(base, count)
 	assert(Type:isa(base))
 	self.base = assert(base)
 	self.count = assert(count)
-	self.destName = self:initDestName()
+	
+	self.destName = self.base.destName..'['..self.count..']'
 end
-function ArrayType:getBase() return self.base:getBase() end
-function ArrayType:initDestName()
-	return self.base.destName..'['..self.count..']'
+function ArrayType:addTypeUsed(...)
+	return self.base:addTypeUsed(...)
 end
 function ArrayType:declare(var)
 	if var then
@@ -222,10 +219,19 @@ local PtrType = Type:subclass()
 function PtrType:init(base)
 	assert(Type:isa(base))
 	self.base = assert(base)
-	self.destName = self:initDestName()
+	
+--[[
+	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
+	if ArrayType:isa(self.base) then
+		self.destName = self.base.base.destName..' (*)'..self.base.count
+	end
+--]]
+	-- base (*field)[count]
+	-- and if you do that ... you also need the field name
+	self.destName = self.base.destName..' *'
 end
-function PtrType:getBase()
-	return self.base:getBase()
+function PtrType:addTypeUsed(...)
+	return self.base:addTypeUsed(...)
 end
 -- [[
 function PtrType:declare(var)
@@ -239,48 +245,33 @@ function PtrType:declare(var)
 	return PtrType.super.declare(self, var)
 end
 --]]
-function PtrType:initDestName()
---[[
-	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
-	if ArrayType:isa(self.base) then
-		return self.base.base.destName..' (*)'..self.base.count
-	end
---]]
-	-- base (*field)[count]
-	-- and if you do that ... you also need the field name
-	return self.base.destName..' *'
-end
 
 local STLVectorType = Type:subclass()
 function STLVectorType:init(T)
 	assert(Type:isa(T))
 	self.T = T
-	self.destName = self:initDestName()
-end
-function STLVectorType:getBase() return self.T:getBase() end
-function STLVectorType:initDestName()
 	-- TODO the suffix substitution will screw up for vector-of-pointers-to-fixed-size-arrays
-	return 'vector_'..self.T.destName:gsub(' %*', '_ptr')
+	self.destName = 'vector_'..self.T.destName:gsub(' %*', '_ptr')
+end
+function STLVectorType:addTypeUsed(...)
+	return self.T:addTypeUsed(...)
 end
 
 local STLDequeType = Type:subclass()
 function STLDequeType:init(T)
 	assert(Type:isa(T))
 	self.T = T
-	self.destName = self:initDestName()
+	self.destName = 'deque_'..self.T.destName:gsub(' %*', '_ptr')
 end
-function STLDequeType:getBase() return self.T:getBase() end
-function STLDequeType:initDestName()
-	return 'deque_'..self.T.destName:gsub(' %*', '_ptr')
+function STLDequeType:addTypeUsed(...)
+	return self.T:addTypeUsed(...)
 end
-
 
 local AnonStructType = Type:subclass()
 function AnonStructType:init() 
-	self.destName = self:initDestName()
+	-- TODO nil, and don't use it anywhere too
+	self.destName = '' 
 end
-function AnonStructType:getBase() return self end
-function AnonStructType:initDestName() return '' end	-- assume the caller does stuff right
 function AnonStructType:addTypeUsed(typesUsed) end
 
 
