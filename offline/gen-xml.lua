@@ -665,6 +665,10 @@ function Emitter:buildStructType(
 								-- no struct def -- add type
 								-- but don't add it if it's a locally defined struct
 								fieldType:addTypesUsed(self.typesUsed)
+								-- remove locally defined structs from the require() fields
+								for k, _ in pairs(self.localStructNames) do
+									self.typesUsed[k] = nil
+								end
 							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
 						end
