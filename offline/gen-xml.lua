@@ -201,7 +201,7 @@ function Type:declare(var)
 	end
 	return self.destName..' '..(var or '')
 end
-function Type:addTypeUsed(typesUsed)
+function Type:addTypesUsed(typesUsed)
 	if not reservedTypeNames[self.name] then
 		typesUsed[self.destName] = true
 	end
@@ -215,8 +215,8 @@ function ArrayType:init(base, count)
 	
 	self.destName = self.base.destName..'['..self.count..']'
 end
-function ArrayType:addTypeUsed(...)
-	return self.base:addTypeUsed(...)
+function ArrayType:addTypesUsed(...)
+	return self.base:addTypesUsed(...)
 end
 function ArrayType:declare(var)
 	if var then
@@ -240,8 +240,8 @@ function PtrType:init(base)
 	-- and if you do that ... you also need the field name
 	self.destName = self.base.destName..' *'
 end
-function PtrType:addTypeUsed(...)
-	return self.base:addTypeUsed(...)
+function PtrType:addTypesUsed(...)
+	return self.base:addTypesUsed(...)
 end
 -- [[
 function PtrType:declare(var)
@@ -263,8 +263,8 @@ function STLVectorType:init(T)
 	-- TODO the suffix substitution will screw up for vector-of-pointers-to-fixed-size-arrays
 	self.destName = 'vector_'..self.T.destName:gsub(' %*', '_ptr')
 end
-function STLVectorType:addTypeUsed(...)
-	return self.T:addTypeUsed(...)
+function STLVectorType:addTypesUsed(...)
+	return self.T:addTypesUsed(...)
 end
 
 local STLDequeType = Type:subclass()
@@ -273,8 +273,8 @@ function STLDequeType:init(T)
 	self.T = T
 	self.destName = 'deque_'..self.T.destName:gsub(' %*', '_ptr')
 end
-function STLDequeType:addTypeUsed(...)
-	return self.T:addTypeUsed(...)
+function STLDequeType:addTypesUsed(...)
+	return self.T:addTypesUsed(...)
 end
 
 local AnonStructType = Type:subclass()
@@ -282,7 +282,7 @@ function AnonStructType:init()
 	-- TODO nil, and don't use it anywhere too
 	self.destName = '' 
 end
-function AnonStructType:addTypeUsed(typesUsed) end
+function AnonStructType:addTypesUsed(typesUsed) end
 
 
 local function buildTypesUsed(typesUsed)
@@ -375,7 +375,7 @@ function Emitter:getTypeFromAttrOrChildren(
 		end
 
 		local structType = self:makeStructType(
-			namespace:concat'_'..makeTypeName(baseFieldName or '')	-- struct name
+			namespace:concat'_'..'_'..makeTypeName(baseFieldName or '')	-- struct name
 		)
 
 		-- implicit inline struct
@@ -658,12 +658,16 @@ function Emitter:buildStructType(
 									self.outStmts:insert(code)
 									self.outStmts:insert']]'
 									-- tell future structs not to use this name ... hmm ... how to connect all those dots
-									self.localStructNames[fieldType.destName] = true
+									if not reservedTypeNames[fieldType.destName] then
+										fieldType:addTypesUsed(self.localStructNames)
+
+io.stderr:write('self.localStructNames = '..table.keys(self.localStructNames):concat', '..'\n')
+									end
 								end
 							else
 								-- no struct def -- add type
 								-- but don't add it if it's a locally defined struct
-								fieldType:addTypeUsed(self.typesUsed)
+								fieldType:addTypesUsed(self.typesUsed)
 								for k, _ in pairs(self.localStructNames) do
 									self.typesUsed[k] = nil
 								end
@@ -859,7 +863,7 @@ function GlobalEmitter:process(node)
 			)
 			assert(globalType)
 			assert(Type:isa(globalType))
-			globalType:addTypeUsed(self.typesUsed)
+			globalType:addTypesUsed(self.typesUsed)
 			if code and string.trim(code) ~= '' then
 				globalStructDefs:insert(code)
 			end
@@ -912,7 +916,12 @@ local globalEmitter = GlobalEmitter{
 	outpath = (destdir/('globals.lua')),
 }
 
+local fs = table()
 for f in (dfhacksrcdir/'xml'):dir() do
+	fs:insert(f)
+end
+fs:sort(function(a,b) return a.path < b.path end)
+for _,f in ipairs(fs) do
 	io.stderr:write('processing ', f.path, '\n')
 	local res, err = xpcall(function()
 		local basefilename = f.path:match'^df%.(.*)%.xml$'
