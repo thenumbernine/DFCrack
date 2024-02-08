@@ -175,8 +175,11 @@ end
 local class = require 'ext.class'
 
 local Type = class()
-function Type:init(name) self.name = assert(name) end
-function Type:makeLuaName()
+function Type:init(name)
+	self.name = assert(name)
+	self.destName = self:initDestName()
+end
+function Type:initDestName()
 	local res = reservedTypeNames[self.name]
 	if res == true then res = self.name end
 	if res then return res end
@@ -187,7 +190,7 @@ function Type:declare(var)
 	if var then
 		var = snakeToCamelCase(var)
 	end
-	return self:makeLuaName()..' '..(var or '')
+	return self.destName..' '..(var or '')
 end
 function Type:addTypeUsed(typesUsed)
 	local baseType = self:getBase().name
@@ -202,10 +205,11 @@ function ArrayType:init(base, count)
 	assert(Type:isa(base))
 	self.base = assert(base)
 	self.count = assert(count)
+	self.destName = self:initDestName()
 end
 function ArrayType:getBase() return self.base:getBase() end
-function ArrayType:makeLuaName()
-	return self.base:makeLuaName()..'['..self.count..']'
+function ArrayType:initDestName()
+	return self.base.destName..'['..self.count..']'
 end
 function ArrayType:declare(var)
 	if var then
@@ -218,6 +222,7 @@ local PtrType = Type:subclass()
 function PtrType:init(base)
 	assert(Type:isa(base))
 	self.base = assert(base)
+	self.destName = self:initDestName()
 end
 function PtrType:getBase()
 	return self.base:getBase()
@@ -234,44 +239,48 @@ function PtrType:declare(var)
 	return PtrType.super.declare(self, var)
 end
 --]]
-function PtrType:makeLuaName()
+function PtrType:initDestName()
 --[[
 	-- if this is a pointer-to-an-array then you als need to wrap parenthesis
 	if ArrayType:isa(self.base) then
-		return self.base.base:makeLuaName()..' (*)'..self.base.count
+		return self.base.base.destName..' (*)'..self.base.count
 	end
 --]]
 	-- base (*field)[count]
 	-- and if you do that ... you also need the field name
-	return self.base:makeLuaName()..' *'
+	return self.base.destName..' *'
 end
 
 local STLVectorType = Type:subclass()
 function STLVectorType:init(T)
 	assert(Type:isa(T))
 	self.T = T
+	self.destName = self:initDestName()
 end
 function STLVectorType:getBase() return self.T:getBase() end
-function STLVectorType:makeLuaName()
+function STLVectorType:initDestName()
 	-- TODO the suffix substitution will screw up for vector-of-pointers-to-fixed-size-arrays
-	return 'vector_'..self.T:makeLuaName():gsub(' %*', '_ptr')
+	return 'vector_'..self.T.destName:gsub(' %*', '_ptr')
 end
 
 local STLDequeType = Type:subclass()
 function STLDequeType:init(T)
 	assert(Type:isa(T))
 	self.T = T
+	self.destName = self:initDestName()
 end
 function STLDequeType:getBase() return self.T:getBase() end
-function STLDequeType:makeLuaName()
-	return 'deque_'..self.T:makeLuaName():gsub(' %*', '_ptr')
+function STLDequeType:initDestName()
+	return 'deque_'..self.T.destName:gsub(' %*', '_ptr')
 end
 
 
 local AnonStructType = Type:subclass()
-function AnonStructType:init() end
+function AnonStructType:init() 
+	self.destName = self:initDestName()
+end
 function AnonStructType:getBase() return self end
-function AnonStructType:makeLuaName() return '' end	-- assume the caller does stuff right
+function AnonStructType:initDestName() return '' end	-- assume the caller does stuff right
 function AnonStructType:addTypeUsed(typesUsed) end
 
 
@@ -307,9 +316,11 @@ function Emitter:init(args)
 	-- collections of strings to be turned into ffi.cdef's
 	-- used by StructEmitter and global Emitter
 	-- if a struct goes here then it shouldn't go in the typesUsed
+	-- TODO ... really is this just the same as .out?
 	self.outStmts = table()
 
 	-- keep track of what names have been used so far in the case of a name collision
+	-- TODO make Type store its dest name upon creation, then use this to verify uniqueness 
 	self.localStructNames = {}
 end
 
@@ -456,7 +467,7 @@ function Emitter:makeTypeNode(
 				self.outStmts:insert(code)
 				self.outStmts:insert']]'
 			end
-			self.outStmts:insert("makeSTLDeque'"..templateType:makeLuaName().."'")
+			self.outStmts:insert("makeSTLDeque'"..templateType.destName.."'")
 			
 			return STLDequeType(templateType)
 		elseif fieldtag == 'stl-vector' then
@@ -473,7 +484,7 @@ function Emitter:makeTypeNode(
 				self.outStmts:insert(code)
 				self.outStmts:insert']]'
 			end
-			self.outStmts:insert("makeSTLVector'"..templateType:makeLuaName().."'")
+			self.outStmts:insert("makeSTLVector'"..templateType.destName.."'")
 
 			return STLVectorType(templateType)
 		elseif fieldtag == 'df-flagarray' then
@@ -618,7 +629,7 @@ function Emitter:makeStructNode(
 									self.outStmts:insert(code)
 									self.outStmts:insert']]'
 									-- tell future structs not to use this name ... hmm ... how to connect all those dots
-									self.localStructNames[fieldType:makeLuaName()] = true
+									self.localStructNames[fieldType.destName] = true
 								end
 							else
 								-- no struct def -- add type
