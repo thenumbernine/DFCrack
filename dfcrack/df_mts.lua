@@ -16,7 +16,9 @@ do
 	-- but really
 	-- really
 	-- how hard is it to type df.world[0].raws.creatures.all[id]
-	-- or if its hard, then why all these needless namespace structs that are only used once? just flatten them.
+	-- or if its hard, then why all these needless namespace structs that are only used once? 
+	-- just flatten them.
+	-- df.world[0].allCreatureRaws[id]
 
 	-- static method
 	function mt.getVectorPtr()
@@ -29,7 +31,10 @@ do
 	-- hmm but most these vectors are vectors-of-pointers anyways
 	-- that means this will need a double-dereference when its valid ...
 	function mt.find(id)
-		return mt.getVectorPtr():at(id)
+		local o = mt.getVectorPtr():at(id)
+		if not o then return nil end	-- if :at() fails then it returns nil
+		-- now o is of type CreatureRaw** so ...
+		return o[0]
 	end
 	--]]
 
@@ -89,25 +94,31 @@ do
 
 	function mt:casteFlagSet(flag, race, caste)
 -- TODO segfaulting
-do return false end		
+--do return false end		
+		assert(flag ~= nil)
 		race = race or self.race
 		caste = caste or self.caste
+print('CreatureRaw:casteFlagSet', flag, race, caste)
 	
 		local creature = df.CreatureRaw.find(race);
+		-- 'creature' is df.world[0].raws.creatures.all[] vector entry, which is a CreatureRaw*
 		-- need explicit nil test to detect null pointer cdata
---print('creature', creature)
+print('creature', creature)
 		if creature == nil then return false end
---print('creature[0]', creature[0])
+print('creature[0]', creature[0])
+		-- i.g. sometimes they can be nil ?
 		if creature[0] == nil then return false end
 
---print('creature caste', creature[0].caste)
-		local craw = creature[0].caste:at(caste)
---print('craw', craw)		
+print('creature caste', creature.caste)
+		-- this is crashing ...
+		local craw = creature.caste:at(caste)
+print'craw'
+print('craw', craw)
 		if craw == nil then return false end
---print('craw[0]', craw[0])
+print('craw[0]', craw[0])
 		if craw[0] == nil then return false end
 
---print('craw flags', craw[0].flags)
+print('craw flags', craw[0].flags)
 		return bit.band(craw[0].flags, flag) ~= 0
 	end
 
@@ -136,7 +147,7 @@ do return false end
 	function mt:isOpposedToLife()
 		if self.curse.removeTags1.OPPOSED_TO_LIFE ~= 0 then return false end
 		if self.curse.addTags1.OPPOSED_TO_LIFE ~= 0 then return true end
-		return self:casteFlagSet(CasteRawFlags_OPPOSED_TO_LIFE)
+		return self:casteFlagSet(ffi.C.CasteRawFlags_OPPOSED_TO_LIFE)
 	end
 
 	function mt:isSane()
@@ -167,7 +178,7 @@ do return false end
 		if self.scuttle ~= 0 then return false end
 		if self.curse.removeTags1.CRAZED ~= 0 then return false end
 		if self.curse.addTags1.CRAZED ~= 0 then return true end
-		return self:casteFlagSet(CasteRawFlags_CRAZED)
+		return self:casteFlagSet(ffi.C.CasteRawFlags_CRAZED)
 	end
 
 	function mt:isOwnGroup()

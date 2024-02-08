@@ -1,9 +1,18 @@
 --[[
 half hearted manually procured file of the globals.
 get rid of this in favor of generated dfcrack/df/*.lua
+
+TODO autogen a script for vanilla dfhack to write out all library/include/df/*.h struct sizeof()'s and offsetof()'s
+I think they have this accessible by script in the master branch
+or maybe autogen a gdb script to run on vanilla dfhack -g ?
 --]]
 local ffi = require 'ffi'
 local template = require 'template'
+
+local function asserteq(a,b)
+	if a == b then return true end
+	error('expected '..tostring(a)..' == '..tostring(b))
+end
 
 local vec2s = require 'vec-ffi.vec2s'
 local vec3s = require 'vec-ffi.vec3s'
@@ -34,7 +43,13 @@ makeStdVector('std_string', 'vector_string')
 -- TODO WTF WHO USES BOOL VECTOR?!?!?!??!
 -- this is guaranteed to be broken.  at best, array size is >>3 the vector size
 -- at worse, it's a fully dif struct underneath
-makeStdVector('bool', 'vector_bool')
+ffi.cdef[[
+typedef struct vector_bool {
+	uint8_t * v;
+	uint8_t * idk[4];
+} vector_bool;
+]]
+asserteq(ffi.sizeof'vector_bool', 40)
 
 -- 'T' is the ptr base type
 local function makeStdVectorPtr(T, name)
@@ -395,6 +410,36 @@ enum {
 };
 ]]
 ffi.cdef'typedef vector_int16 vector_JobSkill;'
+
+-- skill_rating.h
+
+ffi.cdef[[
+typedef int32_t SkillRating;
+enum {
+	SkillRating_Dabbling, // 0, 0x0
+	SkillRating_Novice, // 1, 0x1
+	SkillRating_Adequate, // 2, 0x2
+	SkillRating_Competent, // 3, 0x3
+	SkillRating_Skilled, // 4, 0x4
+	SkillRating_Proficient, // 5, 0x5
+	SkillRating_Talented, // 6, 0x6
+	SkillRating_Adept, // 7, 0x7
+	SkillRating_Expert, // 8, 0x8
+	SkillRating_Professional, // 9, 0x9
+	SkillRating_Accomplished, // 10, 0xA
+	SkillRating_Great, // 11, 0xB
+	SkillRating_Master, // 12, 0xC
+	SkillRating_HighMaster, // 13, 0xD
+	SkillRating_GrandMaster, // 14, 0xE
+	SkillRating_Legendary, // 15, 0xF
+	SkillRating_Legendary1, // 16, 0x10
+	SkillRating_Legendary2, // 17, 0x11
+	SkillRating_Legendary3, // 18, 0x12
+	SkillRating_Legendary4, // 19, 0x13
+	SkillRating_Legendary5, // 20, 0x14
+};
+]]
+ffi.cdef'typedef vector_int32 vector_SkillRating;'
 
 -- profession.h
 
@@ -1289,10 +1334,222 @@ typedef struct {
 ffi.cdef'typedef struct UnitWound UnitWound;'
 makeStdVectorPtr'UnitWound'
 
--- caste_body_info.h
+-- gait_info.h
+
+ffi.cdef[[typedef struct GaitInfo GaitInfo;]]
+makeStdVectorPtr'GaitInfo'
+
+-- creature_interaction_effect.h
 
 -- TODO
-ffi.cdef'typedef struct CasteBodyInfo CasteBodyInfo;'
+ffi.cdef'typedef struct CreatureInteractionEffect CreatureInteractionEffect;'
+makeStdVectorPtr'CreatureInteractionEffect'
+
+-- breath_attack_type.h
+
+ffi.cdef[[
+typedef int16_t BreathAttackType;
+enum {
+	BreathAttackType_TRAILING_DUST_FLOW, // 0, 0x0
+	BreathAttackType_TRAILING_VAPOR_FLOW, // 1, 0x1
+	BreathAttackType_TRAILING_GAS_FLOW, // 2, 0x2
+	BreathAttackType_SOLID_GLOB, // 3, 0x3
+	BreathAttackType_LIQUID_GLOB, // 4, 0x4
+	BreathAttackType_UNDIRECTED_GAS, // 5, 0x5
+	BreathAttackType_UNDIRECTED_VAPOR, // 6, 0x6
+	BreathAttackType_UNDIRECTED_DUST, // 7, 0x7
+	BreathAttackType_WEB_SPRAY, // 8, 0x8
+	BreathAttackType_DRAGONFIRE, // 9, 0x9
+	BreathAttackType_FIREJET, // 10, 0xA
+	BreathAttackType_FIREBALL, // 11, 0xB
+	BreathAttackType_WEATHER_CREEPING_GAS, // 12, 0xC
+	BreathAttackType_WEATHER_CREEPING_VAPOR, // 13, 0xD
+	BreathAttackType_WEATHER_CREEPING_DUST, // 14, 0xE
+	BreathAttackType_WEATHER_FALLING_MATERIAL, // 15, 0xF
+	BreathAttackType_SPATTER_POWDER, // 16, 0x10
+	BreathAttackType_SPATTER_LIQUID, // 17, 0x11
+	BreathAttackType_UNDIRECTED_ITEM_CLOUD, // 18, 0x12
+	BreathAttackType_TRAILING_ITEM_FLOW, // 19, 0x13
+	BreathAttackType_SHARP_ROCK, // 20, 0x14
+	BreathAttackType_OTHER, // 21, 0x15
+};
+]]
+
+-- interaction_source_usage_hint.h
+
+ffi.cdef[[
+typedef int32_t InteractionSourceUsageHint;
+typedef vector_int32 vector_InteractionSourceUsageHint;
+enum {
+	InteractionSourceUsageHint_MAJOR_CURSE, // 0, 0x0
+	InteractionSourceUsageHint_GREETING, // 1, 0x1
+	InteractionSourceUsageHint_CLEAN_SELF, // 2, 0x2
+	InteractionSourceUsageHint_CLEAN_FRIEND, // 3, 0x3
+	InteractionSourceUsageHint_ATTACK, // 4, 0x4
+	InteractionSourceUsageHint_FLEEING, // 5, 0x5
+	InteractionSourceUsageHint_NEGATIVE_SOCIAL_RESPONSE, // 6, 0x6
+	InteractionSourceUsageHint_TORMENT, // 7, 0x7
+	InteractionSourceUsageHint_DEFEND, // 8, 0x8
+	InteractionSourceUsageHint_MEDIUM_CURSE, // 9, 0x9
+	InteractionSourceUsageHint_MINOR_CURSE, // 10, 0xA
+	InteractionSourceUsageHint_MEDIUM_BLESSING, // 11, 0xB
+	InteractionSourceUsageHint_MINOR_BLESSING, // 12, 0xC
+};
+]]
+
+-- interaction_effect_location_hint.h
+
+ffi.cdef[[
+typedef int32_t InteractionEffectLocationHint;
+typedef vector_int32 vector_InteractionEffectLocationHint;
+enum {
+	InteractionEffectLocationHint_IN_WATER, // 0, 0x0
+	InteractionEffectLocationHint_IN_MAGMA, // 1, 0x1
+	InteractionEffectLocationHint_NO_WATER, // 2, 0x2
+	InteractionEffectLocationHint_NO_MAGMA, // 3, 0x3
+	InteractionEffectLocationHint_NO_THICK_FOG, // 4, 0x4
+	InteractionEffectLocationHint_OUTSIDE, // 5, 0x5
+};
+]]
+
+-- creature_interaction_target_flags.h
+
+ffi.cdef[[
+typedef struct CreatureInteractionTargetFlags {
+	uint32_t flags;
+	struct {
+		uint32_t LINE_OF_SIGHT : 1;
+		uint32_t TOUCHABLE : 1;
+		uint32_t DISTURBER_ONLY : 1;
+		uint32_t SELF_ALLOWED : 1;
+		uint32_t SELF_ONLY : 1;
+	};
+} CreatureInteractionTargetFlags;
+]]
+makeStdVector'CreatureInteractionTargetFlags'
+
+-- creature_interaction.h
+
+ffi.cdef[[
+typedef struct CreatureInteraction {
+	vector_string_ptr bp_required_type;
+	vector_string_ptr bp_required_name;
+	std_string unk_1;
+	std_string unk_2;
+	std_string material_str0;
+	std_string material_str1;
+	std_string material_str2;
+	BreathAttackType materialBreath;
+	std_string verb_2nd;
+	std_string verb_3rd;
+	std_string verb_mutual;
+	std_string verb_reverse_2nd; /*!< for RETRACT_INTO_BP, e.g. "unroll" */
+	std_string verb_reverse_3rd;
+	std_string target_verb_2nd;
+	std_string target_verb_3rd;
+	std_string interaction_type;
+	int32_t type_id;
+	vector_InteractionSourceUsageHint usageHint;
+	vector_InteractionEffectLocationHint locationHint;
+	union {
+		int32_t flags;
+		struct {
+			int32_t CAN_BE_MUTUAL : 1;
+			int32_t VERBAL : 1;
+			int32_t FREE_ACTION : 1;
+		};
+	};
+	vector_string_ptr unk_3;
+	vector_CreatureInteractionTargetFlags targetFlags;
+	vector_int32 target_ranges;
+	vector_string_ptr unk_4;
+	vector_int32 max_target_numbers;
+	vector_int32 verbal_speeches;
+	vector_ptr unk_5;
+	std_string adv_name;
+	int32_t wait_period;
+} CreatureInteraction;
+]]
+asserteq(ffi.sizeof'CreatureInteraction', 408)
+
+-- body_part_raw.h
+
+-- TODO
+ffi.cdef'typedef struct BodyPartRaw BodyPartRaw;'
+makeStdVectorPtr'BodyPartRaw'
+
+-- caste_attack.h
+
+-- TODO
+ffi.cdef'typedef struct CasteAttack CasteAttack;'
+makeStdVectorPtr'CasteAttack'
+
+-- caste_body_info.h
+
+ffi.cdef[[
+typedef int32_t CasteBodyInfo_Interactions_Type;
+enum {
+	CasteBodyInfo_Interactions_Type_RETRACT_INTO_BP, // 0, 0x0
+	CasteBodyInfo_Interactions_Type_CAN_DO_INTERACTION, // 1, 0x1
+	CasteBodyInfo_Interactions_Type_ROOT_AROUND, // 2, 0x2
+};
+typedef struct CasteBodyInfo_Interactions {
+	CasteBodyInfo_Interactions_Type type;
+	CreatureInteraction interaction;
+} CasteBodyInfo_Interactions;
+]]
+makeStdVectorPtr'CasteBodyInfo_Interactions'
+
+ffi.cdef[[
+typedef struct CasteBodyInfo_ExtraButcherObjects {
+	int16_t unk_1;
+	std_string unk_2;
+	int32_t unk_3;
+	std_string unk_4;
+	std_string unk_5;
+	std_string unk_6;
+	std_string unk_7;
+	std_string unk_8;
+	int16_t unk_9;
+	int16_t unk_10;
+	int16_t unk_11;
+	int32_t unk_12;
+	int32_t unk_13;
+} CasteBodyInfo_ExtraButcherObjects;
+]]
+makeStdVectorPtr'CasteBodyInfo_ExtraButcherObjects'
+
+ffi.cdef[[
+typedef struct CasteBodyInfo {
+	vector_BodyPartRaw_ptr bodyParts;
+	vector_CasteAttack_ptr attacks;
+	vector_CasteBodyInfo_Interactions_ptr interactions;
+	vector_CasteBodyInfo_ExtraButcherObjects_ptr extra_butcher_objects;
+	int32_t total_relsize; /*!< unless INTERNAL or EMBEDDED */
+	vector_int16 layer_part;
+	vector_int16 layer_idx;
+	vector_uint32 numbered_masks; /*!< 1 bit per instance of a numbered body part */
+	vector_int32 layer_nonsolid;
+	vector_int32 nonsolidLayers;
+	/**
+	 * Since v0.34.01
+	 */
+	union {
+		uint32_t flags;
+		struct {
+			uint32_t unk0 : 1;
+		};
+	}; /*!< since v0.34.01 */
+	vector_GaitInfo_ptr gait_info[5];
+	MaterialVecRef materials;
+	int32_t fraction_total;
+	int32_t fraction_base;
+	int32_t fractionFat;
+	int32_t fraction_muscle;
+	int32_t unk_v40_2[11]; /*!< since v0.40.01 */
+} CasteBodyInfo;
+]]
+asserteq(ffi.sizeof'CasteBodyInfo', 464)
 
 -- unit_attribute.h
 
@@ -1471,7 +1728,7 @@ typedef union {
 	struct {
 		uint32_t flow_size : 3; /*!< liquid amount */
 		uint32_t pile : 1; /*!< stockpile; Adventure: lit */
-		uint32_t/*df::tile_dig_designation*/ dig : 3; /*!< Adventure: line_of_sight, furniture_memory, item_memory */
+		uint32_t/*TileDigDesignation*/ dig : 3; /*!< Adventure: line_of_sight, furniture_memory, item_memory */
 		uint32_t smooth : 2; /*!< Adventure: creature_memory, original_cave */
 		uint32_t hidden : 1;
 		uint32_t geolayer_index : 4;
@@ -1479,13 +1736,13 @@ typedef union {
 		uint32_t subterranean : 1;
 		uint32_t outside : 1;
 		uint32_t biome : 4;
-		uint32_t/*df::tile_liquid*/ liquid_type : 1;
+		uint32_t/*TileLiquid*/ liquid_type : 1;
 		uint32_t water_table : 1; /*!< aquifer */
 		uint32_t rained : 1;
-		uint32_t/*df::tile_traffic*/ traffic : 2;
-		uint32_t flow_forbid : 1;
+		uint32_t/*TileTraffic*/ traffic : 2;
+		uint32_t flowForbid : 1;
 		uint32_t liquid_static : 1;
-		uint32_t feature_local : 1;
+		uint32_t featureLocal : 1;
 		uint32_t feature_global : 1;
 		uint32_t water_stagnant : 1;
 		uint32_t water_salt : 1;
@@ -1783,7 +2040,7 @@ struct Unit {
 		vector_int32 unk_items; /*!< since v0.34.06 */
 		vector_int32 uniforms[4];
 		union {
-			uint32_t whole;	/* not needed? */
+			uint32_t flags;	/* not needed? */
 			uint32_t update : 1;
 		} pickupFlags;	/* aslo not needed?  just pickupUpdate intead? */
 		vector_int32 uniformPickup;
@@ -1879,7 +2136,7 @@ struct Unit {
 		vector_int32 tissue_style_civID;
 		vector_int32 tissue_styleID;
 		vector_int32 tissue_style_type;
-		vector_int32 tissue_length; /*!< description uses bp_modifiers[style_list_idx[index] ] */
+		vector_int32 tissueLength; /*!< description uses bp_modifiers[styleList_idx[index] ] */
 		UnitGenes genes;
 		vector_int32 colors;
 	} appearance;
@@ -2154,7 +2411,7 @@ struct Unit {
 	int32_t tendons_heal;
 	int32_t ligaments_heal;
 	int32_t weight;
-	int32_t weight_fraction; /*!< 1e-6 */
+	int32_t weightFraction; /*!< 1e-6 */
 	vector_int32 burrows;
 	UnitVisionCone* vision_cone;
 	vector_Occupation_ptr occupations; /*!< since v0.42.01 */
@@ -2271,7 +2528,7 @@ typedef struct {
 	int16_t countdown;
 	Item * item;
 
-	/* vermin_flags */
+	/* verminFlags */
 	uint32_t anon_1 : 1;
 	uint32_t is_colony : 1;
 	uint32_t anon_2 : 1;
@@ -2798,7 +3055,7 @@ typedef struct FileCompressorst {
 	int32_t outBufferAmountWritten;		/* offset: 0x248 */
 } FileCompressorst;						/* sizeof: 0x250 */
 ]]
-assert(ffi.sizeof'FileCompressorst' == 0x250)
+asserteq(ffi.sizeof'FileCompressorst', 0x250)
 
 -- save_version.h
 
@@ -2987,7 +3244,7 @@ ffi.cdef[[
 typedef int16_t VagueRelationshipType;
 enum {
 	VagueRelationshipType_none = -1, /* -1, 0xFFFFFFFFFFFFFFFF*/
-	VagueRelationshipType_childhood_friend, /* 0, 0x0*/
+	VagueRelationshipType_childhoodFriend, /* 0, 0x0*/
 	VagueRelationshipType_war_buddy, /* 1, 0x1*/
 	VagueRelationshipType_jealous_obsession, /* 2, 0x2*/
 	VagueRelationshipType_jealous_relationship_grudge, /* 3, 0x3*/
@@ -3302,11 +3559,513 @@ makeStdVectorPtr'CreatureVariation'
 ffi.cdef'typedef struct CreatureGraphicsAppointment CreatureGraphicsAppointment;'
 makeStdVectorPtr'CreatureGraphicsAppointment'
 
+-- caste_raw_flags.h
+
+ffi.cdef[[
+typedef int32_t CasteRawFlags;
+enum {
+	CasteRawFlags_CAN_BREATHE_WATER, // 0, 0x0
+	CasteRawFlags_CANNOT_BREATHE_AIR, // 1, 0x1
+	CasteRawFlags_LOCKPICKER, // 2, 0x2
+	/**
+	* the flag used internally is actually MISCHIEVIOUS
+	*/
+	CasteRawFlags_MISCHIEVOUS, // 3, 0x3
+	CasteRawFlags_PATTERNFLIER, // 4, 0x4
+	CasteRawFlags_CURIOUS_BEAST, // 5, 0x5
+	CasteRawFlags_CURIOUS_BEAST_ITEM, // 6, 0x6
+	CasteRawFlags_CURIOUS_BEAST_GUZZLER, // 7, 0x7
+	CasteRawFlags_FLEEQUICK, // 8, 0x8
+	CasteRawFlags_AT_PEACE_WITH_WILDLIFE, // 9, 0x9
+	CasteRawFlags_CAN_SWIM, // 10, 0xA
+	CasteRawFlags_OPPOSED_TO_LIFE, // 11, 0xB
+	CasteRawFlags_CURIOUS_BEAST_EATER, // 12, 0xC
+	CasteRawFlags_NO_EAT, // 13, 0xD
+	CasteRawFlags_NO_DRINK, // 14, 0xE
+	CasteRawFlags_NO_SLEEP, // 15, 0xF
+	CasteRawFlags_COMMON_DOMESTIC, // 16, 0x10
+	CasteRawFlags_WAGON_PULLER, // 17, 0x11
+	CasteRawFlags_PACK_ANIMAL, // 18, 0x12
+	CasteRawFlags_FLIER, // 19, 0x13
+	CasteRawFlags_LARGE_PREDATOR, // 20, 0x14
+	CasteRawFlags_MAGMA_VISION, // 21, 0x15
+	CasteRawFlags_FIREIMMUNE, // 22, 0x16
+	CasteRawFlags_FIREIMMUNE_SUPER, // 23, 0x17
+	CasteRawFlags_WEBBER, // 24, 0x18
+	CasteRawFlags_WEBIMMUNE, // 25, 0x19
+	CasteRawFlags_FISHITEM, // 26, 0x1A
+	CasteRawFlags_IMMOBILE_LAND, // 27, 0x1B
+	CasteRawFlags_IMMOLATE, // 28, 0x1C
+	CasteRawFlags_MILKABLE, // 29, 0x1D
+	CasteRawFlags_NO_SPRING, // 30, 0x1E
+	CasteRawFlags_NO_SUMMER, // 31, 0x1F
+	CasteRawFlags_NO_AUTUMN, // 32, 0x20
+	CasteRawFlags_NO_WINTER, // 33, 0x21
+	CasteRawFlags_BENIGN, // 34, 0x22
+	CasteRawFlags_VERMIN_NOROAM, // 35, 0x23
+	CasteRawFlags_VERMIN_NOTRAP, // 36, 0x24
+	CasteRawFlags_VERMIN_NOFISH, // 37, 0x25
+	CasteRawFlags_HAS_NERVES, // 38, 0x26
+	CasteRawFlags_NO_DIZZINESS, // 39, 0x27
+	CasteRawFlags_NO_FEVERS, // 40, 0x28
+	CasteRawFlags_NO_UNIT_TYPE_COLOR, // 41, 0x29
+	CasteRawFlags_NO_CONNECTIONS_FOR_MOVEMENT, // 42, 0x2A
+	CasteRawFlags_SUPERNATURAL, // 43, 0x2B
+	CasteRawFlags_AMBUSHPREDATOR, // 44, 0x2C
+	CasteRawFlags_GNAWER, // 45, 0x2D
+	CasteRawFlags_NOT_BUTCHERABLE, // 46, 0x2E
+	CasteRawFlags_COOKABLE_LIVE, // 47, 0x2F
+	CasteRawFlags_HAS_SECRETION, // 48, 0x30
+	CasteRawFlags_IMMOBILE, // 49, 0x31
+	CasteRawFlags_MULTIPART_FULL_VISION, // 50, 0x32
+	CasteRawFlags_MEANDERER, // 51, 0x33
+	CasteRawFlags_THICKWEB, // 52, 0x34
+	CasteRawFlags_TRAINABLE_HUNTING, // 53, 0x35
+	CasteRawFlags_PET, // 54, 0x36
+	CasteRawFlags_PET_EXOTIC, // 55, 0x37
+	CasteRawFlags_HAS_ROTTABLE, // 56, 0x38
+	/**
+	* aka INTELLIGENT_SPEAKS
+	*/
+	CasteRawFlags_CAN_SPEAK, // 57, 0x39
+	/**
+	* aka INTELLIGENT_LEARNS
+	*/
+	CasteRawFlags_CAN_LEARN, // 58, 0x3A
+	CasteRawFlags_UTTERANCES, // 59, 0x3B
+	CasteRawFlags_BONECARN, // 60, 0x3C
+	CasteRawFlags_CARNIVORE, // 61, 0x3D
+	CasteRawFlags_AQUATIC_UNDERSWIM, // 62, 0x3E
+	CasteRawFlags_NOEXERT, // 63, 0x3F
+	CasteRawFlags_NOPAIN, // 64, 0x40
+	CasteRawFlags_EXTRAVISION, // 65, 0x41
+	CasteRawFlags_NOBREATHE, // 66, 0x42
+	CasteRawFlags_NOSTUN, // 67, 0x43
+	CasteRawFlags_NONAUSEA, // 68, 0x44
+	CasteRawFlags_HAS_BLOOD, // 69, 0x45
+	CasteRawFlags_TRANCES, // 70, 0x46
+	CasteRawFlags_NOEMOTION, // 71, 0x47
+	CasteRawFlags_SLOW_LEARNER, // 72, 0x48
+	CasteRawFlags_NOSTUCKINS, // 73, 0x49
+	CasteRawFlags_HAS_PUS, // 74, 0x4A
+	CasteRawFlags_NOSKULL, // 75, 0x4B
+	CasteRawFlags_NOSKIN, // 76, 0x4C
+	CasteRawFlags_NOBONES, // 77, 0x4D
+	CasteRawFlags_NOMEAT, // 78, 0x4E
+	CasteRawFlags_PARALYZEIMMUNE, // 79, 0x4F
+	CasteRawFlags_NOFEAR, // 80, 0x50
+	CasteRawFlags_CANOPENDOORS, // 81, 0x51
+	/**
+	* set if the tag is present; corpse parts go to map_renderer.cursor_other
+	*/
+	CasteRawFlags_ITEMCORPSE, // 82, 0x52
+	CasteRawFlags_GETS_WOUND_INFECTIONS, // 83, 0x53
+	CasteRawFlags_NOSMELLYROT, // 84, 0x54
+	CasteRawFlags_REMAINS_UNDETERMINED, // 85, 0x55
+	CasteRawFlags_HASSHELL, // 86, 0x56
+	CasteRawFlags_PEARL, // 87, 0x57
+	CasteRawFlags_TRAINABLE_WAR, // 88, 0x58
+	CasteRawFlags_NO_THOUGHT_CENTER_FOR_MOVEMENT, // 89, 0x59
+	CasteRawFlags_ARENA_RESTRICTED, // 90, 0x5A
+	CasteRawFlags_LAIR_HUNTER, // 91, 0x5B
+	/**
+	* previously LIKES_FIGHTING
+	*/
+	CasteRawFlags_GELDABLE, // 92, 0x5C
+	CasteRawFlags_VERMIN_HATEABLE, // 93, 0x5D
+	CasteRawFlags_VEGETATION, // 94, 0x5E
+	CasteRawFlags_MAGICAL, // 95, 0x5F
+	CasteRawFlags_NATURAL_ANIMAL, // 96, 0x60
+	CasteRawFlags_HAS_BABYSTATE, // 97, 0x61
+	CasteRawFlags_HAS_CHILDSTATE, // 98, 0x62
+	CasteRawFlags_MULTIPLE_LITTER_RARE, // 99, 0x63
+	CasteRawFlags_MOUNT, // 100, 0x64
+	CasteRawFlags_MOUNT_EXOTIC, // 101, 0x65
+	CasteRawFlags_FEATURE_ATTACK_GROUP, // 102, 0x66
+	CasteRawFlags_VERMIN_MICRO, // 103, 0x67
+	CasteRawFlags_EQUIPS, // 104, 0x68
+	CasteRawFlags_LAYS_EGGS, // 105, 0x69
+	CasteRawFlags_GRAZER, // 106, 0x6A
+	CasteRawFlags_NOTHOUGHT, // 107, 0x6B
+	CasteRawFlags_TRAPAVOID, // 108, 0x6C
+	CasteRawFlags_CAVE_ADAPT, // 109, 0x6D
+	CasteRawFlags_MEGABEAST, // 110, 0x6E
+	CasteRawFlags_SEMIMEGABEAST, // 111, 0x6F
+	CasteRawFlags_ALL_ACTIVE, // 112, 0x70
+	CasteRawFlags_DIURNAL, // 113, 0x71
+	CasteRawFlags_NOCTURNAL, // 114, 0x72
+	CasteRawFlags_CREPUSCULAR, // 115, 0x73
+	CasteRawFlags_MATUTINAL, // 116, 0x74
+	CasteRawFlags_VESPERTINE, // 117, 0x75
+	CasteRawFlags_LIGHT_GEN, // 118, 0x76
+	CasteRawFlags_LISP, // 119, 0x77
+	CasteRawFlags_GETS_INFECTIONS_FROM_ROT, // 120, 0x78
+	CasteRawFlags_HAS_SOLDIER_TILE, // 121, 0x79
+	CasteRawFlags_ALCOHOL_DEPENDENT, // 122, 0x7A
+	CasteRawFlags_CAN_SWIM_INNATE, // 123, 0x7B
+	CasteRawFlags_POWER, // 124, 0x7C
+	CasteRawFlags_TENDONS, // 125, 0x7D
+	CasteRawFlags_LIGAMENTS, // 126, 0x7E
+	CasteRawFlags_HAS_TILE, // 127, 0x7F
+	CasteRawFlags_HAS_COLOR, // 128, 0x80
+	CasteRawFlags_HAS_GLOW_TILE, // 129, 0x81
+	CasteRawFlags_HAS_GLOW_COLOR, // 130, 0x82
+	CasteRawFlags_FEATURE_BEAST, // 131, 0x83
+	CasteRawFlags_TITAN, // 132, 0x84
+	CasteRawFlags_UNIQUE_DEMON, // 133, 0x85
+	CasteRawFlags_DEMON, // 134, 0x86
+	CasteRawFlags_MANNERISM_LAUGH, // 135, 0x87
+	CasteRawFlags_MANNERISM_SMILE, // 136, 0x88
+	CasteRawFlags_MANNERISM_WALK, // 137, 0x89
+	CasteRawFlags_MANNERISM_SIT, // 138, 0x8A
+	CasteRawFlags_MANNERISM_BREATH, // 139, 0x8B
+	CasteRawFlags_MANNERISM_POSTURE, // 140, 0x8C
+	CasteRawFlags_MANNERISM_STRETCH, // 141, 0x8D
+	CasteRawFlags_MANNERISM_EYELIDS, // 142, 0x8E
+	CasteRawFlags_NIGHT_CREATURE, // 143, 0x8F
+	CasteRawFlags_NIGHT_CREATURE_HUNTER, // 144, 0x90
+	CasteRawFlags_NIGHT_CREATURE_BOGEYMAN, // 145, 0x91
+	CasteRawFlags_CONVERTED_SPOUSE, // 146, 0x92
+	CasteRawFlags_SPOUSE_CONVERTER, // 147, 0x93
+	CasteRawFlags_SPOUSE_CONVERSION_TARGET, // 148, 0x94
+	CasteRawFlags_DIE_WHEN_VERMIN_BITE, // 149, 0x95
+	CasteRawFlags_REMAINS_ON_VERMIN_BITE_DEATH, // 150, 0x96
+	CasteRawFlags_COLONY_EXTERNAL, // 151, 0x97
+	CasteRawFlags_LAYS_UNUSUAL_EGGS, // 152, 0x98
+	CasteRawFlags_RETURNS_VERMIN_KILLS_TO_OWNER, // 153, 0x99
+	CasteRawFlags_HUNTS_VERMIN, // 154, 0x9A
+	CasteRawFlags_ADOPTS_OWNER, // 155, 0x9B
+	CasteRawFlags_HAS_SOUND_ALERT, // 156, 0x9C
+	CasteRawFlags_HAS_SOUND_PEACEFUL_INTERMITTENT, // 157, 0x9D
+	CasteRawFlags_NOT_LIVING, // 158, 0x9E
+	CasteRawFlags_NO_PHYS_ATT_GAIN, // 159, 0x9F
+	CasteRawFlags_NO_PHYS_ATT_RUST, // 160, 0xA0
+	CasteRawFlags_CRAZED, // 161, 0xA1
+	CasteRawFlags_BLOODSUCKER, // 162, 0xA2
+	CasteRawFlags_NO_VEGETATION_PERTURB, // 163, 0xA3
+	CasteRawFlags_DIVE_HUNTS_VERMIN, // 164, 0xA4
+	CasteRawFlags_VERMIN_GOBBLER, // 165, 0xA5
+	CasteRawFlags_CANNOT_JUMP, // 166, 0xA6
+	CasteRawFlags_STANCE_CLIMBER, // 167, 0xA7
+	CasteRawFlags_CANNOT_CLIMB, // 168, 0xA8
+	CasteRawFlags_LOCAL_POPS_CONTROLLABLE, // 169, 0xA9
+	CasteRawFlags_OUTSIDER_CONTROLLABLE, // 170, 0xAA
+	CasteRawFlags_LOCAL_POPS_PRODUCE_HEROES, // 171, 0xAB
+	CasteRawFlags_STRANGE_MOODS, // 172, 0xAC
+	CasteRawFlags_HAS_GRASP, // 173, 0xAD
+	CasteRawFlags_HAS_FLY_RACE_GAIT, // 174, 0xAE
+	CasteRawFlags_HAS_RACE_GAIT, // 175, 0xAF
+	CasteRawFlags_NIGHT_CREATURE_NIGHTMARE, // 176, 0xB0
+	CasteRawFlags_NIGHT_CREATURE_EXPERIMENTER, // 177, 0xB1
+	CasteRawFlags_SPREAD_EVIL_SPHERES_IF_RULER, // 178, 0xB2
+};
+]]
+
+-- body_appearance_modifier.h
+
+ffi.cdef'typedef struct BodyAppearanceModifier BodyAppearanceModifier;'
+makeStdVectorPtr'BodyAppearanceModifier'
+
+-- bp_appearance_modifier.h
+
+ffi.cdef'typedef struct BPAppearanceModifier BPAppearanceModifier;'
+makeStdVectorPtr'BPAppearanceModifier'
+
+-- color_modifier_raw.h
+
+ffi.cdef'typedef struct ColorModifierRaw ColorModifierRaw;'
+makeStdVectorPtr'ColorModifierRaw'
+
+-- tissue_style_raw.h
+
+ffi.cdef'typedef struct TissueStyleRaw TissueStyleRaw;'
+makeStdVectorPtr'TissueStyleRaw'
+
+-- matter_state.h
+
+ffi.cdef[[
+typedef int16_t MatterState;
+enum {
+	MatterState_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	MatterState_Solid, // 0, 0x0
+	MatterState_Liquid, // 1, 0x1
+	MatterState_Gas, // 2, 0x2
+	MatterState_Powder, // 3, 0x3
+	MatterState_Paste, // 4, 0x4
+	MatterState_Pressed, // 5, 0x5
+};
+]]
 
 -- caste_raw.h
 
---- TODO
-ffi.cdef'typedef struct CasteRaw CasteRaw;'
+ffi.cdef[[
+typedef struct CasteRaw_ShearableTissueLayer {
+	int8_t unk_0;
+	int8_t unk_1;
+	int32_t length;
+	vector_int16 partIndex;
+	vector_int16 layerIndex;
+	vector_int32 bpModifiersIndex;
+} CasteRaw_ShearableTissueLayer;
+]]
+makeStdVectorPtr'CasteRaw_ShearableTissueLayer'
+
+ffi.cdef[[
+typedef struct CasteRaw_Secretion {
+	int16_t matType;
+	int32_t matIndex;
+	MatterState matState;
+	std_string matTypeStr;
+	std_string matIndexStr;
+	std_string unk_44;
+	vector_int16 body_partID;
+	vector_int16 layerID;
+	int32_t cause; /*!< since v0.40.01; 2 EXERTION, 1 EXTREME_EMOTION, 0 always? */
+} CasteRaw_Secretion;
+]]
+makeStdVectorPtr'CasteRaw_Secretion'
+
+ffi.cdef[[
+typedef struct CasteRaw_Sound {
+	int32_t unk_1;
+	int32_t unk_2;
+	int32_t unk_3;
+	int32_t unk_4;
+	std_string caption[3];
+} CasteRaw_Sound;
+]]
+makeStdVectorPtr'CasteRaw_Sound'
+
+ffi.cdef[[
+typedef struct {
+	std_string unk_1;
+	std_string unk_2;
+	std_string unk_3;
+	int16_t unk_4;
+	int32_t unk_5;
+	int32_t unk_6;
+	int32_t unk_7;
+} CasteRaw_Unknown1;
+]]
+makeStdVectorPtr'CasteRaw_Unknown1'
+
+ffi.cdef[[
+typedef struct CasteRaw {
+	std_string caste_id;
+	std_string caste_name[3];
+	std_string vermin_bite_txt;
+	std_string gnawer_txt;
+	std_string baby_name[2];
+	std_string child_name[2];
+	std_string itemcorpse_str[5];
+	std_string remains[2];
+	std_string description;
+	/**
+	 * fingers[2], nose, ear, head, eyes, mouth, hair, knuckles, lips, cheek, nails, f eet, arms, hands, tongue, leg
+	 */
+	std_string mannerisms[17];
+	uint8_t caste_tile;
+	uint8_t caste_soldier_tile;
+	uint8_t caste_alttile;
+	uint8_t caste_soldier_alttile;
+	uint8_t caste_glowtile;
+	uint16_t homeotherm;
+	uint16_t min_temp;
+	uint16_t max_temp;
+	uint16_t fixed_temp;
+	int16_t caste_color[3];
+	struct {
+		int16_t litter_size_min;
+		int16_t litter_size_max;
+		int16_t penetratepower;
+		int16_t vermin_bite_chance;
+		int16_t grasstrample;
+		int16_t buildingdestroyer;
+		ItemType itemcorpse_itemtype; /*!< no longer used? Changes when the same save is reloaded */
+		int16_t itemcorpse_itemsubtype;
+		int16_t itemcorpse_materialtype; /*!< no longer used? Changes when the same save is reloaded */
+		int16_t itemcorpse_materialindex;
+		int16_t itemcorpse_quality;
+		int16_t remains_color[3];
+		int16_t difficulty;
+		int16_t caste_glowcolor[3]; /*!< different from same save with 0.44.12 */
+		int16_t beach_frequency;
+		int16_t clutch_size_min;
+		int16_t clutch_size_max;
+		int16_t vision_arc_min;
+		int16_t vision_arc_max;
+		int32_t speed; /*!< no longer used */
+		int32_t modvalue;
+		int32_t petvalue;
+		int32_t milkable;
+		int32_t viewrange;
+		int32_t maxage_min;
+		int32_t maxage_max;
+		int32_t baby_age; /*!< no longer used? Silly large value 7628903 */
+		int32_t child_age; /*!< no longer used? Changes when the same save is reloaded */
+		int32_t swim_speed; /*!< no longer used */
+		int32_t trade_capacity;
+		int32_t unk4;
+		int32_t pop_ratio;
+		int32_t adult_size;
+		int32_t bone_mat;
+		int32_t bone_matidx;
+		int32_t fish_mat_index;
+		int32_t egg_mat_index;
+		int32_t attack_trigger[3];
+		int32_t egg_size;
+		int32_t grazer;
+		int32_t petvalue_divisor;
+		int32_t prone_to_rage;
+		int32_t unk6[29]; /*!< different from same save with 0.44.12 */
+	} misc;
+	struct {
+		int16_t a[50];
+		int16_t b[50];
+		int16_t c[50];
+	} personality;
+	DFBitArray/*CasteRawFlags*/ flags;
+	int32_t index; /*!< global across creatures */
+	CasteBodyInfo bodyInfo;
+	vector_ptr caste_speech_1;
+	vector_ptr caste_speech_2;
+	int32_t skill_rates[4][147];
+	struct {
+		int32_t phys_att_range[6][7];
+		int32_t ment_att_range[13][7];
+		int32_t phys_att_rates[6][4];
+		int32_t ment_att_rates[13][4];
+		int32_t phys_att_cap_perc[6];
+		int32_t ment_att_cap_perc[13];
+	} attributes;
+	Gender sex;
+	int32_t orientationMale[3]; /*!< since v0.40.01 */
+	int32_t orientation_female[3]; /*!< since v0.40.01 */
+	vector_int32 body_size_1; /*!< age in ticks */
+	vector_int32 body_size_2; /*!< size at the age at the same index in body_size_1 */
+	vector_BodyAppearanceModifier_ptr bodyAppearanceModifiers;
+	struct {
+		vector_BPAppearanceModifier_ptr modifiers;
+		vector_int32 modifierIndex;
+		vector_int16 partIndex;
+		vector_int16 layerIndex;
+		vector_int16 style_partIndex;
+		vector_int16 style_layerIndex;
+		vector_int32 style_listIndex;
+	} bp_appearance;
+	vector_ColorModifierRaw_ptr colorModifiers;
+	vector_TissueStyleRaw_ptr tissueStyles;
+	vector_CasteRaw_ShearableTissueLayer_ptr shearableTissueLayer;
+	vector_ptr unk16a[4];
+	vector_int32 unk16b[4];
+	int32_t appearance_gene_count;
+	int32_t color_gene_count;
+	vector_JobSkill natural_skill_id;
+	vector_int32 natural_skill_exp;
+	vector_SkillRating natural_skill_lvl;
+	struct {
+		std_string singular[Num_Profession];
+		std_string plural[Num_Profession];
+	} casteProfessionName;
+	struct {
+		vector_int16 extractMat;
+		vector_int32 extractMatIndex;
+		vector_string_ptr extract_str[3];
+		int16_t milkable_mat;
+		int32_t milkable_matidx;
+		std_string milkable_str[3];
+		int16_t webber_mat;
+		int32_t webber_matidx;
+		std_string webber_str[3];
+		int16_t vermin_bite_mat;
+		int32_t vermin_bite_matidx;
+		int16_t vermin_bite_chance;
+		std_string vermin_bite_str[3];
+		int16_t tendons_mat;
+		int32_t tendons_matidx;
+		std_string tendons_str[3];
+		int32_t tendons_heal;
+		int16_t ligaments_mat;
+		int32_t ligaments_matidx;
+		std_string ligaments_str[3];
+		int32_t ligaments_heal;
+		int16_t blood_state;
+		int16_t blood_mat;
+		int32_t blood_matidx;
+		std_string blood_str[3];
+		int16_t pus_state;
+		int16_t pus_mat;
+		int32_t pus_matidx;
+		std_string pus_str[3];
+		vector_int16 egg_material_mattype;
+		vector_int32 egg_material_matindex;
+		vector_string_ptr egg_material_str[3];
+		vector_ItemType lays_unusual_eggs_itemtype;
+		vector_int16 lays_unusual_eggs_itemsubtype;
+		vector_int16 lays_unusual_eggs_mattype;
+		vector_int32 lays_unusual_eggs_matindex;
+		vector_string_ptr lays_unusual_eggs_str[5];
+	} extracts;
+	vector_CasteRaw_Secretion_ptr secretion;
+	vector_string_ptr creatureClass;
+	struct {
+		vector_string_ptr syndrome_dilution_identifier; /*!< since v0.42.01; SYNDROME_DILUTION_FACTOR */
+		vector_int32 syndrome_dilution_factor; /*!< since v0.42.01; SYNDROME_DILUTION_FACTOR */
+		vector_string_ptr gobble_vermin_class;
+		vector_string_ptr gobble_vermin_creature_1;
+		vector_string_ptr gobble_vermin_creature_2;
+		vector_int32 infect_all; /*!< since v0.34.01; for spatter applied to all bp */
+		vector_int32 infect_local; /*!< since v0.34.01; for spatter applied to one bp */
+		vector_int32 unk23f; /*!< since v0.34.01 */
+		vector_int32 unk23g; /*!< since v0.34.01 */
+		DFBitArray/*int*/ unk24_flags;
+		DFBitArray/*int*/ unk25_flags;
+		int32_t armor_sizes[4][4]; /*!< index by UBSTEP */
+		int32_t pants_sizes[4]; /*!< index by LBSTEP */
+		int32_t helm_size;
+		int32_t shield_sizes[4]; /*!< index by UPSTEP */
+		int32_t shoes_sizes[4]; /*!< index by UPSTEP */
+		int32_t gloves_sizes[4]; /*!< index by UPSTEP */
+		MaterialVecRef materials;
+		vector_int16 unk_2f20;
+		vector_int8 unk_2f30;
+		vector_int32 unk_2f40;
+		vector_int16 unk_2f50; /*!< since v0.34.01 */
+		int16_t mat_type;
+		int32_t mat_index;
+	} unknown2;
+	int32_t habit_num[2];
+	vector_int16 habit_1;
+	vector_int32 habit_2;
+	vector_int16 lair_1;
+	vector_int32 lair_2;
+	vector_int16 lair_characteristic_1;
+	vector_int32 lair_characteristic_2;
+	struct {
+		vector_int32 unk_1;
+		vector_ptr unk_2;
+	} lair_hunter_speech;
+	struct {
+		vector_ptr unk_1;
+		vector_int32 unk_2;
+	} unk29;
+	vector_ptr specific_food[2];
+	vector_CasteRaw_Sound_ptr sound;
+	vector_int32 soundAlert;
+	vector_int32 soundPeacefulIntermittent;
+	vector_CasteRaw_Unknown1_ptr unk_1; /*!< since v0.34.01 */
+	int32_t smell_trigger;
+	int32_t odor_level;
+	std_string odor_string;
+	int32_t low_light_vision;
+	vector_string_ptr sense_creature_class_1;
+	vector_int8 sense_creature_class_2;
+	vector_int16 sense_creature_class_3;
+	vector_int16 sense_creature_class_4;
+	vector_int16 sense_creature_class_5;
+} CasteRaw;
+]]
+asserteq(ffi.sizeof'CasteRaw', 9264)
 makeStdVectorPtr'CasteRaw'
 
 -- material.h
@@ -3349,7 +4108,7 @@ typedef struct CreatureRaw {
 	vector_int16 sphere;
 	vector_CasteRaw_ptr caste;
 	vector_int32 pop_ratio;
-	DFBitArray flags;
+	DFBitArray/*CreatureRawFlags*/ flags;
 	struct {
 		int32_t texpos[6];
 		int32_t texposGs[6];
@@ -3373,9 +4132,9 @@ typedef struct CreatureRaw {
 	struct {
 		std_string singular[Num_Profession];
 		std_string plural[Num_Profession];
-	} profession_name;
-	int32_t underground_layer_min;
-	int32_t underground_layer_max;
+	} professionName;
+	int32_t undergroundLayer_min;
+	int32_t undergroundLayer_max;
 	vector_int32 modifier_class;
 	vector_int32 modifier_num_patterns; /*!< for color modifiers, == number of items in their pattern_* vectors */
 	struct {
@@ -3392,6 +4151,7 @@ typedef struct CreatureRaw {
 	vector_string_ptr raws;
 } CreatureRaw;
 ]]
+asserteq(ffi.sizeof'CreatureRaw', 11744)
 makeStdVectorPtr'CreatureRaw'
 
 -- creature_handler.h
@@ -3491,13 +4251,6 @@ makeStdVectorPtr'Interaction'
 -- TODO
 ffi.cdef'typedef struct Syndrome Syndrome;'
 makeStdVectorPtr'Syndrome'
-
--- creature_interaction_effect.h
-
--- TODO
-ffi.cdef'typedef struct CreatureInteractionEffect CreatureInteractionEffect;'
-makeStdVectorPtr'CreatureInteractionEffect'
-
 
 -- world_raws.h
 
@@ -3664,8 +4417,8 @@ typedef struct {
 	int32_t world_height;
 	int32_t unk_78;
 	int32_t moon_phase;
-	FlipLatitude flip_latitude;
-	int16_t flip_longitude;
+	FlipLatitude flipLatitude;
+	int16_t flipLongitude;
 	int16_t unk_84;
 	int16_t unk_86;
 	int16_t unk_88;
@@ -3923,14 +4676,14 @@ typedef struct {
 	int32_t cavernLayerPassageDensityMax;
 	int32_t cavernLayerWaterMin;
 	int32_t cavernLayerWaterMax;
-	bool have_bottom_layer_1;
-	bool have_bottom_layer_2;
+	bool have_bottomLayer_1;
+	bool have_bottomLayer_2;
 	int32_t levels_above_ground;
-	int32_t levels_above_layer_1;
-	int32_t levels_above_layer_2;
-	int32_t levels_above_layer_3;
-	int32_t levels_above_layer_4;
-	int32_t levels_above_layer_5;
+	int32_t levels_aboveLayer_1;
+	int32_t levels_aboveLayer_2;
+	int32_t levels_aboveLayer_3;
+	int32_t levels_aboveLayer_4;
+	int32_t levels_aboveLayer_5;
 	int32_t levels_at_bottom;
 	int32_t cave_min_size;
 	int32_t cave_max_size;
@@ -3979,7 +4732,7 @@ typedef struct {
 	int8_t allow_divination; /*!< since v0.47.01 */
 	int8_t allow_demonic_experiments; /*!< since v0.47.01 */
 	int8_t allow_necromancer_experiments; /*!< since v0.47.01 */
-	int8_t allow_necromancer_lieutenants; /*!< since v0.47.01 */
+	int8_t allow_necromancerLieutenants; /*!< since v0.47.01 */
 	int8_t allow_necromancer_ghouls; /*!< since v0.47.01 */
 	int8_t allow_necromancer_summons; /*!< since v0.47.01 */
 	int32_t good_sq_counts_0;
@@ -4028,6 +4781,178 @@ makeStdVectorPtr'WebCluster'
 ffi.cdef'typedef struct Fire Fire;'
 makeStdVectorPtr'Fire'
 
+-- machine_handler.h
+
+ffi.cdef[[
+typedef struct MachineHandler {
+	void * vtable;
+	vector_Machine_ptr all;
+	vector_Machine_ptr bad;
+} MachineHandler;
+]]
+
+-- building_handler.h
+
+for T in ([[
+Building_stockpilest
+Building_civzonest
+Building_actual
+Building_boxst
+Building_cabinetst
+Building_trapst
+Building_doorst
+Building_floodgatest
+Building_hatchst
+Building_grate_wallst
+Building_grate_floorst
+Building_bars_verticalst
+Building_bars_floorst
+Building_wellst
+Building_tablest
+Building_bridgest
+Building_chairst
+Building_tradedepotst
+Building_nestst
+Building_nest_boxst
+Building_bookcasest
+Building_display_furniturest
+Building_hivest
+Building_wagonst
+Building_shopst
+Building_bedst
+Building_traction_benchst
+Building_farmplotst
+Building_gear_assemblyst
+Building_rollersst
+Building_axle_horizontalst
+Building_axle_verticalst
+Building_supportst
+Building_archerytargetst
+Building_screw_pumpst
+Building_water_wheelst
+Building_windmillst
+Building_chainst
+Building_cagest
+Building_statuest
+Building_slabst
+Building_coffinst
+Building_weaponrackst
+Building_armorstandst
+Building_furnacest
+Building_workshopst
+Building_weaponst
+Building_instrumentst
+Building_offering_placest
+]]):gmatch'[%w_]+' do
+	ffi.cdef('typedef struct '..T..' '..T..';')
+	makeStdVectorPtr(T)
+end
+
+ffi.cdef[[
+typedef struct BuildingHandler {
+	void * vtable;	/* TODO */
+	vector_Building_ptr all;
+
+	struct {
+		vector_Building_ptr IN_PLAY;
+		vector_Building_ptr LOCATION_ASSIGNED;
+		vector_Building_stockpilest_ptr STOCKPILE;
+		vector_Building_civzonest_ptr ANY_ZONE;
+		vector_Building_civzonest_ptr ACTIVITY_ZONE;
+		vector_Building_actual_ptr ANY_ACTUAL;
+		vector_Building_ptr ANY_MACHINE;
+		vector_Building_ptr ANY_HOSPITAL_STORAGE;
+		vector_Building_ptr ANY_STORAGE;
+		vector_Building_ptr ANY_BARRACKS;
+		vector_Building_ptr ANY_NOBLE_ROOM;
+		vector_Building_ptr ANY_HOSPITAL;
+		vector_Building_boxst_ptr BOX;
+		vector_Building_cabinetst_ptr CABINET;
+		vector_Building_trapst_ptr TRAP;
+		vector_Building_doorst_ptr DOOR;
+		vector_Building_floodgatest_ptr FLOODGATE;
+		vector_Building_hatchst_ptr HATCH;
+		vector_Building_grate_wallst_ptr GRATE_WALL;
+		vector_Building_grate_floorst_ptr GRATE_FLOOR;
+		vector_Building_bars_verticalst_ptr BARS_VERTICAL;
+		vector_Building_bars_floorst_ptr BARS_FLOOR;
+		vector_Building_ptr WINDOW_ANY;
+		vector_Building_wellst_ptr WELL;
+		vector_Building_tablest_ptr TABLE;
+		vector_Building_bridgest_ptr BRIDGE;
+		vector_Building_chairst_ptr CHAIR;
+		vector_Building_tradedepotst_ptr TRADE_DEPOT;
+		vector_Building_nestst_ptr NEST;
+		vector_Building_nest_boxst_ptr NEST_BOX;
+		vector_Building_bookcasest_ptr BOOKCASE;
+		vector_Building_display_furniturest_ptr DISPLAY_CASE; /*!< since v0.44.01 */
+		vector_Building_hivest_ptr HIVE;
+		vector_Building_wagonst_ptr WAGON;
+		vector_Building_shopst_ptr SHOP;
+		vector_Building_bedst_ptr BED;
+		vector_Building_traction_benchst_ptr TRACTION_BENCH;
+		vector_Building_ptr ANY_ROAD;
+		vector_Building_farmplotst_ptr FARM_PLOT;
+		vector_Building_gear_assemblyst_ptr GEAR_ASSEMBLY;
+		vector_Building_rollersst_ptr ROLLERS;
+		vector_Building_axle_horizontalst_ptr AXLE_HORIZONTAL;
+		vector_Building_axle_verticalst_ptr AXLE_VERTICAL;
+		vector_Building_supportst_ptr SUPPORT;
+		vector_Building_archerytargetst_ptr ARCHERY_TARGET;
+		vector_Building_screw_pumpst_ptr SCREW_PUMP;
+		vector_Building_water_wheelst_ptr WATER_WHEEL;
+		vector_Building_windmillst_ptr WINDMILL;
+		vector_Building_chainst_ptr CHAIN;
+		vector_Building_cagest_ptr CAGE;
+		vector_Building_statuest_ptr STATUE;
+		vector_Building_slabst_ptr SLAB;
+		vector_Building_coffinst_ptr COFFIN;
+		vector_Building_weaponrackst_ptr WEAPON_RACK;
+		vector_Building_armorstandst_ptr ARMOR_STAND;
+		vector_Building_furnacest_ptr FURNACE_ANY;
+		vector_Building_furnacest_ptr FURNACE_WOOD;
+		vector_Building_furnacest_ptr FURNACE_SMELTER_ANY;
+		vector_Building_furnacest_ptr FURNACE_SMELTER_MAGMA;
+		vector_Building_furnacest_ptr FURNACE_KILN_ANY;
+		vector_Building_furnacest_ptr FURNACE_GLASS_ANY;
+		vector_Building_furnacest_ptr FURNACE_CUSTOM;
+		vector_Building_workshopst_ptr WORKSHOP_ANY;
+		vector_Building_workshopst_ptr WORKSHOP_BUTCHER;
+		vector_Building_workshopst_ptr WORKSHOP_MASON;
+		vector_Building_workshopst_ptr WORKSHOP_KENNEL;
+		vector_Building_workshopst_ptr WORKSHOP_FISHERY;
+		vector_Building_workshopst_ptr WORKSHOP_JEWELER;
+		vector_Building_workshopst_ptr WORKSHOP_LOOM;
+		vector_Building_workshopst_ptr WORKSHOP_TANNER;
+		vector_Building_workshopst_ptr WORKSHOP_DYER;
+		vector_Building_workshopst_ptr WORKSHOP_MILL_ANY;
+		vector_Building_workshopst_ptr WORKSHOP_QUERN;
+		vector_Building_workshopst_ptr WORKSHOP_TOOL;
+		vector_Building_workshopst_ptr WORKSHOP_MILLSTONE;
+		vector_Building_workshopst_ptr WORKSHOP_KITCHEN;
+		vector_Building_workshopst_ptr WORKSHOP_STILL;
+		vector_Building_workshopst_ptr WORKSHOP_FARMER;
+		vector_Building_workshopst_ptr WORKSHOP_ASHERY;
+		vector_Building_workshopst_ptr WORKSHOP_CARPENTER;
+		vector_Building_workshopst_ptr WORKSHOP_CRAFTSDWARF;
+		vector_Building_workshopst_ptr WORKSHOP_MECHANIC;
+		vector_Building_workshopst_ptr WORKSHOP_SIEGE;
+		vector_Building_workshopst_ptr WORKSHOP_CLOTHIER;
+		vector_Building_workshopst_ptr WORKSHOP_LEATHER;
+		vector_Building_workshopst_ptr WORKSHOP_BOWYER;
+		vector_Building_workshopst_ptr WORKSHOP_MAGMA_FORGE;
+		vector_Building_workshopst_ptr WORKSHOP_FORGE_ANY;
+		vector_Building_workshopst_ptr WORKSHOP_CUSTOM;
+		vector_Building_weaponst_ptr WEAPON_UPRIGHT;
+		vector_Building_instrumentst_ptr INSTRUMENT_STATIONARY;
+		vector_Building_offering_placest_ptr OFFERING_PLACE;
+	} other;
+
+	vector_Building_ptr bad;
+	bool checkBridgeCollapse;
+	bool checkMachineCollapse;
+} BuildingHandler;
+]]
 
 -- world.h
 
@@ -4108,7 +5033,7 @@ Item_trappartsst
 Item_threadst
 Item_pipe_sectionst
 Item_drinkst
-Item_liquid_miscst
+ItemLiquid_miscst
 Item_powder_miscst
 Item_verminst
 Item_petst
@@ -4147,55 +5072,6 @@ Item_cheesest
 Item_foodst
 Item_ballistaarrowheadst
 ArtifactRecord
-Building_stockpilest
-Building_civzonest
-Building_actual
-Building_boxst
-Building_cabinetst
-Building_trapst
-Building_doorst
-Building_floodgatest
-Building_hatchst
-Building_grate_wallst
-Building_grate_floorst
-Building_bars_verticalst
-Building_bars_floorst
-Building_wellst
-Building_tablest
-Building_bridgest
-Building_chairst
-Building_tradedepotst
-Building_nestst
-Building_nest_boxst
-Building_bookcasest
-Building_display_furniturest
-Building_hivest
-Building_wagonst
-Building_shopst
-Building_bedst
-Building_traction_benchst
-Building_farmplotst
-Building_gear_assemblyst
-Building_rollersst
-Building_axle_horizontalst
-Building_axle_verticalst
-Building_supportst
-Building_archerytargetst
-Building_screw_pumpst
-Building_water_wheelst
-Building_windmillst
-Building_chainst
-Building_cagest
-Building_statuest
-Building_slabst
-Building_coffinst
-Building_weaponrackst
-Building_armorstandst
-Building_furnacest
-Building_workshopst
-Building_weaponst
-Building_instrumentst
-Building_offering_placest
 ]]):gmatch'[%w_]+' do
 	ffi.cdef('typedef struct '..T..' '..T..';')
 	makeStdVectorPtr(T)
@@ -4355,7 +5231,7 @@ enum {
 
 -- matches HistoryHitItem but with an extra bool
 ffi.cdef[[
-typedef struct {
+typedef struct WorldItemTypes {
 	ItemType itemType;
 	int16_t itemSubType;
 	int16_t matType;
@@ -4366,7 +5242,7 @@ typedef struct {
 makeStdVectorPtr'WorldItemTypes'
 
 ffi.cdef[[
-typedef struct {
+typedef struct World_Unknown19325c_Unknown1 {
 	void * unk_1;
 	int32_t unk_2;
 	int16_t unk_3;
@@ -4378,7 +5254,7 @@ typedef struct {
 makeStdVectorPtr'World_Unknown19325c_Unknown1'
 
 ffi.cdef[[
-typedef struct {
+typedef struct World_Unknown19325c_Unknown2 {
 	Item * unk_1;
 	int32_t unk_2;
 	int32_t unk_3;
@@ -4387,7 +5263,7 @@ typedef struct {
 makeStdVectorPtr'World_Unknown19325c_Unknown2'
 
 ffi.cdef[[
-typedef struct {
+typedef struct World_Unknown19325c_Unknown3 {
 	int16_t unk_1;
 	int32_t unk_2;
 	int32_t unk_3;
@@ -4397,7 +5273,7 @@ typedef struct {
 makeStdVectorPtr'World_Unknown19325c_Unknown3'
 
 ffi.cdef[[
-typedef struct {
+typedef struct World {
 	vector_GlowingBarrier_ptr glowingBarriers;
 	vector_DeepVeinHollow_ptr deepVeinHollows;
 	vector_CursedTomb_ptr cursedTombs;
@@ -4552,7 +5428,7 @@ typedef struct {
 		vector_Item_ptr ANY_IN_CONSTRUCTION;
 		vector_Item_drinkst_ptr DRINK;
 		vector_Item_drinkst_ptr ANY_DRINK;
-		vector_Item_liquid_miscst_ptr LIQUID_MISC;
+		vector_ItemLiquid_miscst_ptr LIQUID_MISC;
 		vector_Item_powder_miscst_ptr POWDER_MISC;
 		vector_Item_ptr ANY_COOKABLE;
 		vector_Item_ptr ANY_GENERIC84;
@@ -4614,114 +5490,8 @@ typedef struct {
 
 	JobHandler jobs;
 	list_Projectile projectileList;
-
-	struct {
-		vector_Building_ptr all;
-
-		struct {
-			vector_Building_ptr IN_PLAY;
-			vector_Building_ptr LOCATION_ASSIGNED;
-			vector_Building_stockpilest_ptr STOCKPILE;
-			vector_Building_civzonest_ptr ANY_ZONE;
-			vector_Building_civzonest_ptr ACTIVITY_ZONE;
-			vector_Building_actual_ptr ANY_ACTUAL;
-			vector_Building_ptr ANY_MACHINE;
-			vector_Building_ptr ANY_HOSPITAL_STORAGE;
-			vector_Building_ptr ANY_STORAGE;
-			vector_Building_ptr ANY_BARRACKS;
-			vector_Building_ptr ANY_NOBLE_ROOM;
-			vector_Building_ptr ANY_HOSPITAL;
-			vector_Building_boxst_ptr BOX;
-			vector_Building_cabinetst_ptr CABINET;
-			vector_Building_trapst_ptr TRAP;
-			vector_Building_doorst_ptr DOOR;
-			vector_Building_floodgatest_ptr FLOODGATE;
-			vector_Building_hatchst_ptr HATCH;
-			vector_Building_grate_wallst_ptr GRATE_WALL;
-			vector_Building_grate_floorst_ptr GRATE_FLOOR;
-			vector_Building_bars_verticalst_ptr BARS_VERTICAL;
-			vector_Building_bars_floorst_ptr BARS_FLOOR;
-			vector_Building_ptr WINDOW_ANY;
-			vector_Building_wellst_ptr WELL;
-			vector_Building_tablest_ptr TABLE;
-			vector_Building_bridgest_ptr BRIDGE;
-			vector_Building_chairst_ptr CHAIR;
-			vector_Building_tradedepotst_ptr TRADE_DEPOT;
-			vector_Building_nestst_ptr NEST;
-			vector_Building_nest_boxst_ptr NEST_BOX;
-			vector_Building_bookcasest_ptr BOOKCASE;
-			vector_Building_display_furniturest_ptr DISPLAY_CASE; /*!< since v0.44.01 */
-			vector_Building_hivest_ptr HIVE;
-			vector_Building_wagonst_ptr WAGON;
-			vector_Building_shopst_ptr SHOP;
-			vector_Building_bedst_ptr BED;
-			vector_Building_traction_benchst_ptr TRACTION_BENCH;
-			vector_Building_ptr ANY_ROAD;
-			vector_Building_farmplotst_ptr FARM_PLOT;
-			vector_Building_gear_assemblyst_ptr GEAR_ASSEMBLY;
-			vector_Building_rollersst_ptr ROLLERS;
-			vector_Building_axle_horizontalst_ptr AXLE_HORIZONTAL;
-			vector_Building_axle_verticalst_ptr AXLE_VERTICAL;
-			vector_Building_supportst_ptr SUPPORT;
-			vector_Building_archerytargetst_ptr ARCHERY_TARGET;
-			vector_Building_screw_pumpst_ptr SCREW_PUMP;
-			vector_Building_water_wheelst_ptr WATER_WHEEL;
-			vector_Building_windmillst_ptr WINDMILL;
-			vector_Building_chainst_ptr CHAIN;
-			vector_Building_cagest_ptr CAGE;
-			vector_Building_statuest_ptr STATUE;
-			vector_Building_slabst_ptr SLAB;
-			vector_Building_coffinst_ptr COFFIN;
-			vector_Building_weaponrackst_ptr WEAPON_RACK;
-			vector_Building_armorstandst_ptr ARMOR_STAND;
-			vector_Building_furnacest_ptr FURNACE_ANY;
-			vector_Building_furnacest_ptr FURNACE_WOOD;
-			vector_Building_furnacest_ptr FURNACE_SMELTER_ANY;
-			vector_Building_furnacest_ptr FURNACE_SMELTER_MAGMA;
-			vector_Building_furnacest_ptr FURNACE_KILN_ANY;
-			vector_Building_furnacest_ptr FURNACE_GLASS_ANY;
-			vector_Building_furnacest_ptr FURNACE_CUSTOM;
-			vector_Building_workshopst_ptr WORKSHOP_ANY;
-			vector_Building_workshopst_ptr WORKSHOP_BUTCHER;
-			vector_Building_workshopst_ptr WORKSHOP_MASON;
-			vector_Building_workshopst_ptr WORKSHOP_KENNEL;
-			vector_Building_workshopst_ptr WORKSHOP_FISHERY;
-			vector_Building_workshopst_ptr WORKSHOP_JEWELER;
-			vector_Building_workshopst_ptr WORKSHOP_LOOM;
-			vector_Building_workshopst_ptr WORKSHOP_TANNER;
-			vector_Building_workshopst_ptr WORKSHOP_DYER;
-			vector_Building_workshopst_ptr WORKSHOP_MILL_ANY;
-			vector_Building_workshopst_ptr WORKSHOP_QUERN;
-			vector_Building_workshopst_ptr WORKSHOP_TOOL;
-			vector_Building_workshopst_ptr WORKSHOP_MILLSTONE;
-			vector_Building_workshopst_ptr WORKSHOP_KITCHEN;
-			vector_Building_workshopst_ptr WORKSHOP_STILL;
-			vector_Building_workshopst_ptr WORKSHOP_FARMER;
-			vector_Building_workshopst_ptr WORKSHOP_ASHERY;
-			vector_Building_workshopst_ptr WORKSHOP_CARPENTER;
-			vector_Building_workshopst_ptr WORKSHOP_CRAFTSDWARF;
-			vector_Building_workshopst_ptr WORKSHOP_MECHANIC;
-			vector_Building_workshopst_ptr WORKSHOP_SIEGE;
-			vector_Building_workshopst_ptr WORKSHOP_CLOTHIER;
-			vector_Building_workshopst_ptr WORKSHOP_LEATHER;
-			vector_Building_workshopst_ptr WORKSHOP_BOWYER;
-			vector_Building_workshopst_ptr WORKSHOP_MAGMA_FORGE;
-			vector_Building_workshopst_ptr WORKSHOP_FORGE_ANY;
-			vector_Building_workshopst_ptr WORKSHOP_CUSTOM;
-			vector_Building_weaponst_ptr WEAPON_UPRIGHT;
-			vector_Building_instrumentst_ptr INSTRUMENT_STATIONARY;
-			vector_Building_offering_placest_ptr OFFERING_PLACE;
-		} other;
-
-		vector_Building_ptr bad;
-		bool checkBridgeCollapse;
-		bool checkMachineCollapse;
-	} buildings;
-
-	struct {
-		vector_Machine_ptr all;
-		vector_Machine_ptr bad;
-	} machines;
+	BuildingHandler buildings;
+	MachineHandler machines;
 
 	struct {
 		vector_FlowGuide_ptr all, bad;
@@ -4823,8 +5593,8 @@ typedef struct {
 	} status;
 
 	struct {
-		vector_InteractionInstance_ptr, all, bad;
-	} interctinInstances;
+		vector_InteractionInstance_ptr all, bad;
+	} interctionInstances;
 
 	struct {
 		vector_WrittenContent_ptr all, bad;
@@ -4929,7 +5699,7 @@ typedef struct {
 		int32_t regionX;
 		int32_t regionY;
 		int32_t regionZ;
-		int16_t distance_lookup[53][53];
+		int16_t distanceLookup[53][53];
 	} map;
 
 /*!< since v0.40.01: */
@@ -5172,7 +5942,7 @@ typedef struct {
 		vector_ptr unk_vec3;
 		struct {
 			vector_JobSkill skills;
-			vector_int32 skill_levels;
+			vector_int32 skillLevels;
 			vector_ItemType itemTypes;
 			vector_int16 itemSubTypes;
 			MaterialVecRef itemMaterials;
@@ -5235,6 +6005,29 @@ typedef struct {
 	int32_t unk_26b618; /*!< since v0.40.01 */
 } World;
 ]]
+-- gdb: macro define offsetof(t, f) &((t *) 0)->f
+asserteq(ffi.offsetof('World', 'items'), 0x13ef8)	-- good
+asserteq(ffi.offsetof('World', 'buildings'), 0x1c928)	-- good
+asserteq(ffi.offsetof('World', 'machines'), 0x1d208)	-- good
+asserteq(ffi.offsetof('World', 'flowGuides'), 0x1d240)	-- good
+asserteq(ffi.offsetof('World', 'enemyStatusCache'), 0x1d460)	-- good
+asserteq(ffi.offsetof('World', 'status'), 0x111958)	-- good
+asserteq(ffi.offsetof('World', 'interctionInstances'), 0x113728)	-- good
+asserteq(ffi.offsetof('World', 'writtenContents'), 0x113758)	-- good
+asserteq(ffi.offsetof('World', 'identities'), 0x113788)	-- good
+asserteq(ffi.offsetof('World', 'crimes'), 0x1137e8)	-- good
+asserteq(ffi.offsetof('World', 'armyTrackingInfo'), 0x1138c0)	-- good
+asserteq(ffi.offsetof('World', 'worldgenStatus'), 0x1175e8)	-- good
+asserteq(ffi.offsetof('World', 'pathfinder'), 0x130928)	-- good
+asserteq(ffi.offsetof('World', 'features'), 0x2691a0)	-- good
+asserteq(ffi.cast('size_t', ffi.cast('void*', ffi.cast('World*', 0).features.unk_15)), 0x269380)
+
+-- seems I'm missing 1 field ...
+asserteq(ffi.offsetof('World', 'allowAnnouncements'), 0x2693a8)
+asserteq(ffi.offsetof('World', 'unknown_26a9a9'), 0x2693a9)
+asserteq(ffi.offsetof('World', 'unknown_26a9aa'), 0x2693aa)
+asserteq(ffi.offsetof('World', 'arenaSpawn'), 0x2693b0)
+asserteq(ffi.sizeof'World', 2534184)
 
 -- global_objects.h
 
