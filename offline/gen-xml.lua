@@ -562,11 +562,13 @@ end
 call this to make a struct Type before passing it on to the buildStructType
 --]]
 function Emitter:makeStructType(structDestName)
-	for suffix=0,math.huge do
+io.stderr:write('makeStructType ', structDestName, '\n')	
+	for suffix=1,math.huge do
 		-- keep building structTypes until we find one that's not used
 		-- this should  be fine so long as the Type ctor doesn't write to any external places 
-		local structType = Type(nil, structDestName..(suffix == 0 and '' or suffix))
+		local structType = Type(nil, structDestName..(suffix == 1 and '' or suffix))
 		if not self.localStructNames[structType.destName] then 
+			self.localStructNames[structType.destName] = true
 			return structType
 		end
 	end
@@ -658,19 +660,11 @@ function Emitter:buildStructType(
 									self.outStmts:insert(code)
 									self.outStmts:insert']]'
 									-- tell future structs not to use this name ... hmm ... how to connect all those dots
-									if not reservedTypeNames[fieldType.destName] then
-										fieldType:addTypesUsed(self.localStructNames)
-
-io.stderr:write('self.localStructNames = '..table.keys(self.localStructNames):concat', '..'\n')
-									end
 								end
 							else
 								-- no struct def -- add type
 								-- but don't add it if it's a locally defined struct
 								fieldType:addTypesUsed(self.typesUsed)
-								for k, _ in pairs(self.localStructNames) do
-									self.typesUsed[k] = nil
-								end
 							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
 						end
