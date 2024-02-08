@@ -327,7 +327,10 @@ end
 
 function Emitter:write()
 	self.outpath:write((
-		(self.out:concat'\n'..'\n'):gsub('}%s+;', '};')
+		(self.out:concat'\n'..'\n')
+		-- fix the spacing with inline structs
+		:gsub('}%s+;', '};')
+		:gsub(' +\n\t+ ', ' ')
 	))
 end
 
