@@ -306,6 +306,7 @@ function Emitter:init(args)
 	-- collection of lua declarations. for inline structs and their templated-vector-generations to be inserted into
 	-- collections of strings to be turned into ffi.cdef's
 	-- used by StructEmitter and global Emitter
+	-- if a struct goes here then it shouldn't go in the typesUsed
 	self.structDefs = table()
 end
 
@@ -589,14 +590,17 @@ function Emitter:makeStructNode(
 								-- how about collecting them in another location?
 								if AnonStructType:isa(fieldType) then
 									out:insert(code)
+									-- if this is an anon struct then it shouldn't have any types, right? so no .typesUsed
 								else
+									-- if this is inserted prior then we don't want to require its name, so no .typesUsed
 									self.structDefs:insert(code)
 								end
+							else
+								-- no struct def -- add type
+								fieldType:addTypeUsed(self.typesUsed)
 							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
 
-							-- TODO find which file has which type
-							fieldType:addTypeUsed(self.typesUsed)
 						end
 					end
 				end
