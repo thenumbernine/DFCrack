@@ -20,11 +20,11 @@ typedef struct df_flagarray {
 --]]
 
 -- [[ here's the by-hand port of the headers to luajit ...
-local df = require 'mem'
+local df = require 'byhand.globals'
 
 -- require this after doing the declarations in df
--- since some metatables will go looking in df
-require 'df_mts'
+-- because it itself requires 'byhand.globals'
+require 'byhand.setup-mt-ffi'
 
 --]]
 --[[ here's me working on the xml->luajit port

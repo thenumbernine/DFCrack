@@ -8,15 +8,10 @@ or maybe autogen a gdb script to run on vanilla dfhack -g ?
 --]]
 local ffi = require 'ffi'
 local template = require 'template'
+local struct = require 'struct'
 
 local asserteq = require 'asserteq'
-
--- I do this often enough, here's its own function
-local function assertsizeof(t, s)
-	if ffi.sizeof(t) ~= s then
-		error("expected sizeof("..t..") == "..s..", but found "..ffi.sizeof(t))
-	end
-end
+local assertsizeof = require 'assertsizeof'
 
 local vec2s = require 'vec-ffi.vec2s'
 local vec3s = require 'vec-ffi.vec3s'
@@ -680,6 +675,7 @@ enum {
 
 -- language_name.h
 
+-- [=[
 ffi.cdef[[
 typedef struct LanguageName {
 	std_string firstName;
@@ -691,6 +687,23 @@ typedef struct LanguageName {
 	bool hasName;
 } LanguageName;
 ]]
+--]=]
+--[=[ gives me __tostring support but I need to provide all metatable functionality up front
+-- hmm eventually I'm switching over to this so ... I better think of a way to make it extensible
+struct{
+	name = 'LanguageName',
+	fields = {
+		{type='std_string', name='firstName'},
+		{type='std_string', name='nickname'},
+		{type='int32_t[7]', name='words'},
+		{type='PartOfSpeech[7]', name='partsOfSpeech'},
+		{type='int32_t', name='language'},
+		{type='LanguageNameType', name='type'},
+		{name='hasName', type='bool'},
+	},
+}
+--]=]
+
 assertsizeof('LanguageName', 72)
 
 -- language_word_flags.h
@@ -3112,7 +3125,7 @@ typedef struct FileCompressorst {
 	int32_t outBufferAmountWritten;		/* offset: 0x248 */
 } FileCompressorst;						/* sizeof: 0x250 */
 ]]
-asserteq(ffi.sizeof'FileCompressorst', 0x250)
+assertsizeof('FileCompressorst', 0x250)
 
 -- save_version.h
 
@@ -4436,6 +4449,7 @@ typedef struct WorldRaws {
 	} textObjectCounts;
 } WorldRaws;
 ]]
+assertsizeof('WorldRaws', 48752)
 
 -- world_data.h
 

@@ -1,13 +1,15 @@
 --[[
 put your custom metatable code here.
-TODO put this in its own folder somewhere, like dfcrack/mt/
+TODO later I will split this up per-type and put them in dfcrack/byhand/mt/*
+and then once I convert dfcrack/byhand/types.lua to use struct(), then per-type I'll go looking for any override metatable functionality in this folder 
 --]]
 local ffi = require 'ffi'
 local asserteq = require 'asserteq'
 local table = require 'ext.table'
+local struct = require 'struct'
 
 -- TODO df.globals instead
-local df = require 'mem'
+local df = require 'byhand.globals'
 
 -- LanguageName
 do
@@ -15,16 +17,21 @@ do
 	mt.__index = mt
 
 	function mt:translate(inEnglish, onlyLastPart)
-		local out = table()
+		local out = ''
 
 		local function addWordToOut(word)
 			if type(word) == 'cdata' then
 				if word == nil then return end	-- null std::string pointer?
-				assert(ffi.typeof(word) == ffi.typeof'std_string')
+				if ffi.typeof(word) == ffi.typeof'std_string*' then
+					word = word[0]
+				else
+					asserteq(ffi.typeof(word), ffi.typeof'std_string')
+				end
 				word = word:str()
 			end
 			if word == '' then return end
-			out:insert(word)
+			if #out > 0 then out = out .. ' ' end
+			out = out .. word
 		end
 
 		-- concat lua str with std::string
@@ -55,7 +62,7 @@ do
 				if switch == DInitNickname_REPLACE_ALL then
 					return word
 				elseif switch == DInitNickname_REPLACE_FIRST then
-					out = table()
+					out = ''
 				elseif switch == DInitNickname_CENTRALIZE then
 				end
 				addWordToOut(word)
@@ -116,9 +123,9 @@ do
 			or self.words[5] >= 0
 			then
 				if #out > 0 then
-					out:insert' the'
+					out = out .. ' the'
 				else
-					out:insert'The'
+					out = out .. 'The'
 				end
 			end
 			for i=2,5 do
@@ -131,9 +138,9 @@ do
 			end
 			if self.words[6] >= 0 then
 				if #out > 0 then
-					out:insert'of'
+					out = out ..' of'
 				else
-					out:insert'Of'
+					out = out .. 'Of'
 				end
 				addWordToOut(
 					lang.words:at(self.words[6])
@@ -142,7 +149,7 @@ do
 			end
 		end
 
-		return out:concat' '
+		return out
 	end
 
 	df.LanguageName = ffi.metatype('LanguageName', mt)
@@ -173,9 +180,12 @@ do
 	-- that means this will need a double-dereference when its valid ...
 	function mt.find(id)
 		local o = mt.getVectorPtr():at(id)
-		if not o then return nil end	-- if :at() fails then it returns nil
-		-- now o is of type CreatureRaw** so ...
-		return o[0]
+		-- if :at() fails then it returns nil
+		-- if :at() succeeds then it returns a ptr, which could be null,
+		--  and in luajit null ptrs implicitly cast to true for booleans but == nil will test true, so ...
+		if o == nil then return nil end	
+		-- now o is of type CreatureRaw* so ...
+		return o
 	end
 	--]]
 
@@ -427,8 +437,6 @@ do
 --print('creature', creature)
 		if creature == nil then return false end
 --print('creature[0]', creature[0])
-		-- i.g. sometimes they can be nil ?
-		if creature[0] == nil then return false end
 
 --print('creature caste', creature.caste)
 		-- this is crashing ...
@@ -436,11 +444,9 @@ do
 --print'craw'
 --print('craw', craw)
 		if craw == nil then return false end
---print('craw[0]', craw[0])
-		if craw[0] == nil then return false end
 
 --print('craw flags', craw[0].flags)
-		return craw[0].flags:isSet(flagIndex)
+		return craw.flags:isSet(flagIndex)
 	end
 
 	-- and a lot more yet ...
