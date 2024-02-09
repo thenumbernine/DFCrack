@@ -39,8 +39,7 @@ However my goal is to bake everything into the runtime script, including DF vers
 I've got two versions going at the moment.  One is the manually hand crafted code in `dfcrack/byhand`.  The whole purpose of this is to just get something working and to give me an idea of how to later design the auto-generation code.
 This is functioning but for some simple features, like enumerating units, printing names, printing coordinates, etc.
 
-The second version is auto-generated from the XML files of DFHack.
-Right now it auto-generates LuaJIT FFI code, 
+The second version is auto-generated from the XML files of DFHack, which will be complete in its coverage, but is still WIP.
 
 # Lua External Dependencies
 
@@ -64,3 +63,4 @@ No way I'm touching CMake.
 - Have the XML-generated code make use of [struct-lua](https://github.com/thenumbernine/struct-lua) for runtime generation and filtering of C struct fields based on DF version, for implicit `__tostring` functionality, etc.
 - Have the XML-generated code also spit out some C++ code to wedge into vanilla DFHack or GDB to itself spit out more Lua code of where the C++ struct `sizeof`'s and `offsetof`'s are, for me to then again wedge into DFCrack to run-upon-detection for runtime validation that the generated fields are all aligned correct. Maybe store these in a repo somewhere since all we need is one per DF version/OS/arch build.
 - Port over DFHack's `prospector` plugin to LuaJIT and do a performance comparison.
+- Inter-thread communication, between the main(ui) and the sim threads.  LuaJIT has a few options for this.  LuaLanes, Torch's thread lib, OpenResty probably has something too ...
