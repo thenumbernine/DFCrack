@@ -1,7 +1,7 @@
 --[[
 put your custom metatable code here.
 TODO later I will split this up per-type and put them in dfcrack/byhand/mt/*
-and then once I convert dfcrack/byhand/types.lua to use struct(), then per-type I'll go looking for any override metatable functionality in this folder 
+and then once I convert dfcrack/byhand/types.lua to use struct(), then per-type I'll go looking for any override metatable functionality in this folder
 --]]
 local ffi = require 'ffi'
 local table = require 'ext.table'
@@ -22,6 +22,7 @@ do
 			if type(word) == 'cdata' then
 				if word == nil then return end	-- null std::string pointer?
 				if ffi.typeof(word) == ffi.typeof'std_string*' then
+					-- I think LuaJIT will handle . and : with string* and string and string& the same
 					word = word[0]
 				else
 					assert(ffi.typeof(word) == ffi.typeof'std_string'
@@ -34,7 +35,7 @@ do
 		end
 
 		-- concat lua str with std::string
-		-- testing for nils and std_string's 
+		-- testing for nils and std_string's
 		-- do I need to test, or can I assert that the values will be valid?
 		local function concatStdStr(a,b)
 			assert(type(a) == 'string')
@@ -73,7 +74,7 @@ do
 		local lang = df.world.raws.language
 		if not inEnglish then
 			local tltn = lang.translations:at(self.language)
-			if self.words[0] >= 0 
+			if self.words[0] >= 0
 			or self.words[1] >= 0
 			then
 				local word = ''
@@ -98,7 +99,7 @@ do
 				addWordToOut(tltn.words:at(self.words[6]))
 			end
 		else
-			if self.words[0] >= 0 
+			if self.words[0] >= 0
 			or self.words[1] >= 0
 			then
 				local word = ''
@@ -118,9 +119,9 @@ do
 				end
 				addWordToOut(word)
 			end
-			if self.words[2] >= 0 
-			or self.words[3] >= 0 
-			or self.words[4] >= 0 
+			if self.words[2] >= 0
+			or self.words[3] >= 0
+			or self.words[4] >= 0
 			or self.words[5] >= 0
 			then
 				if #out > 0 then
@@ -184,7 +185,7 @@ do
 		-- if :at() fails then it returns nil
 		-- if :at() succeeds then it returns a ptr, which could be null,
 		--  and in luajit null ptrs implicitly cast to true for booleans but == nil will test true, so ...
-		if o == nil then return nil end	
+		if o == nil then return nil end
 		-- now o is of type CreatureRaw* so ...
 		return o
 	end
@@ -277,13 +278,13 @@ do
 	end
 
 	function mt:isFortControlled()
-		if df.gamemode[0] ~= GameMode_DWARF then 
-			return false 
+		if df.gamemode[0] ~= GameMode_DWARF then
+			return false
 		end
 
 		if self.mood == MoodType_Berserk
 		or self:isCrazed()
-		or self:isOpposedToLife() 
+		or self:isOpposedToLife()
 		or self.enemy.undead ~= nil -- ptr
 		or self.ghostly ~= 0
 		then
@@ -312,7 +313,7 @@ do
 			return false
 		end
 
-		return self.civID ~= -1 
+		return self.civID ~= -1
 		and self.civID == df.ui.civID
 	end
 
@@ -425,7 +426,7 @@ do
 	end
 
 	-- then a lot more here ...
-	
+
 	function mt:casteFlagSet(flagIndex, race, caste)
 		assert(flagIndex ~= nil)
 		race = race or self.race
@@ -453,6 +454,136 @@ do
 	-- and a lot more yet ...
 
 	df.Unit = ffi.metatype('Unit', mt)
+end
+
+-- modules...
+-- should I put these in a dfhack table?
+
+-- Materials module
+do
+	df.Materials = {}
+end
+
+-- Maps module
+do
+	df.Maps = {}
+
+	function df.Maps.isValid()
+		-- TODO how about testing for df.world ?
+		return df.world.map.blockIndex ~= nil
+	end
+
+	function df.Maps.getSize()
+		if not df.Maps.isValid() then return 0,0,0 end
+		local map = df.world.map
+		return map.xCountBlock, map.yCountBlock, map.zCountBlock
+	end
+end
+
+-- Units module
+do
+	df.Units = {}
+
+	require 'ffi.req' 'c.stdint' -- INT32_MIN, INT32_MAX
+
+	local actionTimerPointerTable = {
+		[ffi.C.UnitActionType_Move] = function(action)
+			return action.data.move.timer
+		end,
+		[ffi.C.UnitActionType_Attack] = function(action)
+			if action.data.attack.timer1 ~= 0 then
+				-- Wind-up timer is still active, work on it
+				return action.data.attack.timer1
+			else
+				-- Wind-up timer is finished, work on recovery timer
+				return action.data.attack.timer2
+			end
+		end,
+		[ffi.C.UnitActionType_HoldTerrain] = function(action)
+			return action.data.holdterrain.timer
+		end,
+		[ffi.C.UnitActionType_Climb] = function(action)
+			return action.data.climb.timer
+		end,
+		[ffi.C.UnitActionType_Job] = function(action)
+			return action.data.job.timer
+		end,
+			-- could also patch the unit->job.current_job->completion_timer
+		[ffi.C.UnitActionType_Talk] = function(action)
+			return action.data.talk.timer
+		end,
+		[ffi.C.UnitActionType_Unsteady] = function(action)
+			return action.data.unsteady.timer
+		end,
+		[ffi.C.UnitActionType_Dodge] = function(action)
+			return action.data.dodge.timer
+		end,
+		[ffi.C.UnitActionType_Recover] = function(action)
+			return action.data.recover.timer
+		end,
+		[ffi.C.UnitActionType_StandUp] = function(action)
+			return action.data.standup.timer
+		end,
+		[ffi.C.UnitActionType_LieDown] = function(action)
+			return action.data.liedown.timer
+		end,
+		[ffi.C.UnitActionType_Job2] = function(action)
+			return action.data.job2.timer
+		end,
+			-- could also patch the unit->job.current_job->completion_timer
+		[ffi.C.UnitActionType_PushObject] = function(action)
+			return action.data.pushobject.timer
+		end,
+		[ffi.C.UnitActionType_SuckBlood] = function(action)
+			return action.data.suckblood.timer
+		end,
+	}
+
+	function df.Units.getActionTimerPointer(action)
+		local f = actionTimerPointerTable[action.type]
+		return f and f(action) or nil
+	end
+
+	function df.Units.mutateActionTimerCore(action, mutator)
+		local timer = df.Units.getActionTimerPointer(action)
+		if timer ~= nil and timer[0] > 0 then
+			local value = timer[0]
+			value = mutator(value)
+			if value > ffi.C.INT32_MAX then
+				value = INT32_MAX
+			elseif value < INT32_MIN then
+				value = INT32_MIN
+			end
+			timer[0] = value
+		end
+	end
+
+	function df.Units.validateSetActionTimerAmount(amount)
+		if amount <= 0 then
+			io.stderr:write("Can't set action timer(s) to non-positive amount.\n")
+			return false
+		end
+		return true
+	end
+
+	function df.Units.setGroupActionTimers(unit, amount, affectedActionTypeGroup)
+		-- TODO std::decay here for testing plz
+		assert(ffi.typeof(unit) == ffi.typeof'Unit*')
+		if not df.Units.validateSetActionTimerAmount(amount) then
+			return
+		end
+
+		for _,action in ipairs(unit.actions) do
+			-- TODO
+			local list = nil--df::enum_traits<df::unit_action_type>::attrs(action.type).group
+			for i=0,list:size()-1 do
+				if list.items[i] == affectedActionTypeGroup then
+					df.Units.mutateActionTimerCore(action, function(timerValue) return amount end)
+					break
+				end
+			end
+		end
+	end
 end
 
 -- get metatypes here or just from the ffi.typeof(name)

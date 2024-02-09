@@ -900,6 +900,93 @@ typedef struct HistoryHitItem {
 } HistoryHitItem;
 ]]
 
+-- unit_action_type_group.h
+
+ffi.cdef[[
+typedef int32_t UnitActionTypeGroup;
+enum {
+	UnitActionTypeGroup_All, // 0, 0x0
+	UnitActionTypeGroup_Movement, // 1, 0x1
+	UnitActionTypeGroup_MovementFeet, // 2, 0x2
+	UnitActionTypeGroup_Combat, // 3, 0x3
+	UnitActionTypeGroup_Work, // 4, 0x4
+};
+]]
+
+-- unit_action_type.h
+
+ffi.cdef[[
+typedef int32_t UnitActionType;
+enum {
+	UnitActionType_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	UnitActionType_Move, // 0, 0x0
+	UnitActionType_Attack, // 1, 0x1
+	UnitActionType_Jump, // 2, 0x2
+	UnitActionType_HoldTerrain, // 3, 0x3
+	UnitActionType_ReleaseTerrain, // 4, 0x4
+	UnitActionType_Climb, // 5, 0x5
+	UnitActionType_Job, // 6, 0x6
+	UnitActionType_Talk, // 7, 0x7
+	UnitActionType_Unsteady, // 8, 0x8
+	UnitActionType_Parry, // 9, 0x9
+	UnitActionType_Block, // 10, 0xA
+	UnitActionType_Dodge, // 11, 0xB
+	UnitActionType_Recover, // 12, 0xC
+	UnitActionType_StandUp, // 13, 0xD
+	UnitActionType_LieDown, // 14, 0xE
+	UnitActionType_Job2, // 15, 0xF
+	UnitActionType_PushObject, // 16, 0x10
+	UnitActionType_SuckBlood, // 17, 0x11
+	UnitActionType_HoldItem, // 18, 0x12
+	UnitActionType_ReleaseItem, // 19, 0x13
+	UnitActionType_Unk20, // 20, 0x14
+	UnitActionType_Unk21, // 21, 0x15
+	UnitActionType_Unk22, // 22, 0x16
+	UnitActionType_Unk23, // 23, 0x17
+};
+]]
+
+-- unit_action.h
+
+--[=[ TODO ...
+ffi.cdef[[
+typedef struct UnitAction {
+	UnitActionType type;
+	int32_t id;
+	union {
+		int32_t rawData[24];
+		UnitActionDataMove move;
+		UnitActionDataAttack attack;
+		UnitActionDataJump jump;
+		UnitActionDataHoldTerrain holdterrain;
+		UnitActionDataReleaseTerrain releaseterrain;
+		UnitActionDataClimb climb;
+		UnitActionDataJob job;
+		UnitActionDataTalk talk;
+		UnitActionDataUnsteady unsteady;
+		UnitActionDataParry parry;
+		UnitActionDataBlock block;
+		UnitActionDataDodge dodge;
+		UnitActionDataRecover recover;
+		UnitActionDataStandUp standup;
+		UnitActionDataLieDown liedown;
+		UnitActionDataJob2 job2;
+		UnitActionDataPushObject pushobject;
+		UnitActionDataSuckBlood suckblood;
+		UnitActionDataHoldItem holditem;
+		UnitActionDataReleaseItem releaseitem;
+		UnitActionDataUnkSub20 unk20;
+		UnitActionDataUnkSub21 unk21;
+		UnitActionDataUnkSub22 unk22;
+		UnitActionDataUnkSub23 unk23;
+	} data;
+} UnitAction;
+]]
+--]=]
+-- [=[ until then
+ffi.cdef'typedef struct UnitAction UnitAction;'
+--]=]
+makeStdVectorPtr'UnitAction'
 
 -- unit_station_type.h
 
@@ -1655,12 +1742,6 @@ typedef struct {
 -- TODO
 ffi.cdef[[typedef struct Spatter Spatter;]]
 makeStdVectorPtr'Spatter'
-
--- unit_action.h
-
--- TODO
-ffi.cdef[[typedef struct UnitAction UnitAction;]]
-makeStdVectorPtr'UnitAction'
 
 -- death_type.h
 
