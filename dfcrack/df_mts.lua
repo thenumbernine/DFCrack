@@ -48,7 +48,7 @@ do
 
 	-- [[ vtable method wrappers
 	function mt:getType()
-		return mt.vtable.getType(mt)
+		return self.vtable.getType(self)
 	end
 	--]]
 	
@@ -182,7 +182,13 @@ do
 	function mt:isOwnGroup()
 		local histfig = df.HistoricalFigure.find(self.histFigureID)
 		if histfig == nil or histfig[0] == nil then return false end
+print('histfig[0].entityLinks', histfig[0].entityLinks)		
 		for i,link in ipairs(histfig[0].entityLinks) do
+print('i, link', i, link)
+print('link.entityID', link.entityID)
+print('link.vtable', link.vtable)
+print('link.getType', link.getType)			
+print('link:getType()', link:getType())
 			if link.entityID == df.ui.groupID 
 			and link:getType() == ffi.C.HistfigEntityLinkType_MEMBER
 			then

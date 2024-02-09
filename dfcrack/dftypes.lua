@@ -1455,7 +1455,7 @@ typedef struct CreatureInteraction {
 	std_string target_verb_2nd;
 	std_string target_verb_3rd;
 	std_string interaction_type;
-	int32_t type_id;
+	int32_t typeID;
 	vector_InteractionSourceUsageHint usageHint;
 	vector_InteractionEffectLocationHint locationHint;
 	union {
@@ -3869,7 +3869,7 @@ makeStdVectorPtr'CasteRaw_Unknown1'
 
 ffi.cdef[[
 typedef struct CasteRaw {
-	std_string caste_id;
+	std_string casteID;
 	std_string caste_name[3];
 	std_string vermin_bite_txt;
 	std_string gnawer_txt;
@@ -3978,7 +3978,7 @@ typedef struct CasteRaw {
 	vector_int32 unk16b[4];
 	int32_t appearance_gene_count;
 	int32_t color_gene_count;
-	vector_JobSkill natural_skill_id;
+	vector_JobSkill natural_skillID;
 	vector_int32 natural_skill_exp;
 	vector_SkillRating natural_skill_lvl;
 	struct {
@@ -6174,10 +6174,10 @@ typedef vector_int16 vector_MeetingTopic;
 
 ffi.cdef[[
 typedef struct MeetingDiplomatInfo {
-	int32_t civ_id;
+	int32_t civID;
 	int16_t unk1; /*!< maybe is_first_contact */
-	int32_t diplomat_id;
-	int32_t associate_id;
+	int32_t diplomatID;
+	int32_t associateID;
 	vector_int32/*<enum_field<df::meeting_topic,int32_t>*/ topic_list;
 	vector_int32 topic_parms;
 	EntitySellRequests * sell_requests;
@@ -6650,8 +6650,8 @@ typedef struct UIHotKey {
 	int32_t y;
 	int32_t z;
 	union {
-		int32_t unit_id; /*!< since v0.34.08 */
-		int32_t item_id; /*!< since v0.34.08 */
+		int32_t unitID; /*!< since v0.34.08 */
+		int32_t itemID; /*!< since v0.34.08 */
 	};
 } UIHotKey;
 ]]
@@ -6725,7 +6725,7 @@ enum {
 
 ffi.cdef[[
 typedef struct NemesisOffload {
-	vector_int32 nemesis_save_file_id;
+	vector_int32 nemesis_save_fileID;
 	vector_int16 nemesis_member_idx;
 	vector_Unit_ptr units;
 	UnitChunk * cur_unit_chunk;
@@ -6810,8 +6810,8 @@ makeStdVectorPtr'UI_Unknown8'
 
 ffi.cdef[[
 typedef struct UI_Main_DeadCitizens {
-	int32_t unit_id;
-	int32_t histfig_id;
+	int32_t unitID;
+	int32_t histfigID;
 	int32_t death_year;
 	int32_t death_time;
 	int32_t timer; /*!< +1 per 10 */
@@ -6881,7 +6881,7 @@ typedef struct UI {
 	bool gameOver;
 	struct {
 		vector_InvasionInfo_ptr list;
-		int32_t next_id;
+		int32_t nextID;
 	} invasions;
 	vector_Punishment_ptr punishments;
 	vector_PartyInfo_ptr parties;
@@ -6905,10 +6905,10 @@ typedef struct UI {
 		};
 	} unk23c8_flags;
 	int16_t mood_cooldown;
-	int32_t civ_id;
-	int32_t site_id;
-	int32_t group_id; /*!< i.e. specifically the fortress dwarves */
-	int16_t race_id;
+	int32_t civID;
+	int32_t siteID;
+	int32_t groupID; /*!< i.e. specifically the fortress dwarves */
+	int16_t raceID;
 	vector_int32 unk_races; /*!< since v0.42.01 */
 	vector_int16 farm_crops;
 	vector_Season farm_seasons;
@@ -7021,8 +7021,8 @@ typedef struct UI {
 		int16_t sym_fg_color;
 		int16_t sym_bg_color;
 		vector_string_ptr unk5c04;
-		int32_t next_point_id;
-		int32_t next_route_id;
+		int32_t next_pointID;
+		int32_t next_routeID;
 		int32_t sel_route_idx;
 		int32_t sel_route_waypt_idx;
 		bool in_edit_waypts_mode;
@@ -7030,9 +7030,9 @@ typedef struct UI {
 	} waypoints;
 	struct {
 		vector_Burrow_ptr list;
-		int32_t next_id;
+		int32_t nextID;
 		int32_t sel_index;
-		int32_t sel_id;
+		int32_t selID;
 		bool in_confirm_delete;
 		bool in_add_units_mode;
 		vector_Unit_ptr list_units;
@@ -7050,7 +7050,7 @@ typedef struct UI {
 	} burrows;
 	struct {
 		vector_UI_Alerts_List_ptr list;
-		int32_t next_id;
+		int32_t nextID;
 		int32_t civ_alert_idx;
 	} alerts;
 	struct {
@@ -7080,14 +7080,14 @@ typedef struct UI {
 		vector_SquadAmmoSpec_ptr hunter_ammunition;
 		vector_int32 ammo_items;
 		vector_int32 ammo_units;
-		vector_TrainingAssignment_ptr training_assignments; /*!< since v0.34.06; sorted by animal_id */
+		vector_TrainingAssignment_ptr training_assignments; /*!< since v0.34.06; sorted by animalID */
 	} equipment;
 	/**
 	 * Since v0.34.08
 	 */
 	struct {
 		vector_HaulingRoute_ptr routes;
-		int32_t next_id;
+		int32_t nextID;
 		vector_HaulingRoute_ptr view_routes;
 		vector_HaulingStop_ptr view_stops;
 		vector_int32 view_bad;
@@ -7117,7 +7117,7 @@ typedef struct UI {
 		int32_t traffic_cost_low;
 		int32_t traffic_cost_restricted;
 		vector_UI_Main_DeadCitizens_ptr dead_citizens; /*!< ? */
-		HistoricalEntity* fortress_entity; /*!< entity pointed to by group_id */
+		HistoricalEntity* fortress_entity; /*!< entity pointed to by groupID */
 		WorldSite* fortress_site;
 		UISideBarMode mode;
 		int16_t unk1;
@@ -7142,7 +7142,7 @@ typedef struct UI {
 		int32_t sel_indiv_squad;
 		int32_t unk_70;
 		int32_t squad_list_scroll;
-		int32_t squad_list_first_id;
+		int32_t squad_list_firstID;
 		Squad* nearest_squad;
 		bool in_move_order;
 		int32_t point_list_scroll;
