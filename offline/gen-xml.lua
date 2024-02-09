@@ -299,7 +299,7 @@ local STLDequeType = Type:subclass()
 function STLDequeType:init(T)
 	assert(Type:isa(T))
 	self.T = T
-	self.destName = 'deque_'..self.T.destName:gsub(' %*', '_ptr')
+	self.destName = 'std_deque_'..self.T.destName:gsub(' %*', '_ptr')
 	-- TODO this only works if .T is not a STL class itself...
 	self.reqStmt = "require 'std.deque' '"..self.T.destName.."'"
 end
