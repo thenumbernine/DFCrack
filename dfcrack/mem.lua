@@ -19,7 +19,7 @@ df.titleSpaced = ffi.cast('char*', 0x1a9f2c0)
 -- df.createdItemMatIndex = ffi.cast('vector<TODO>*', 0x1d32c00)
 -- df.createdItemCount = ffi.cast('vector<TODO>*', 0x1d32be0)
 --df.mapRenderer = ffi.cast('MapRenderer*', 0x1aa1d60)
---df.dInit = ffi.cast('dInit*', 0x1a9f4c0)
+df.dInit = ffi.cast('DInit*', 0x1a9f4c0)
 -- df.flows = ffi.cast('vector<TODO>*', 0x232a5f0)
 --df.enabler = ffi.cast('Enabler*', 0x19c0a80)
 --df.gps = ffi.cast('Graphic*', 0x19bff60)
@@ -163,5 +163,9 @@ df.saveOnExit = ffi.cast('bool*', 0x1d32df0)
 df.handleannounce = ffi.cast('bool*', 0x1a1f192)
 df.preserveannounce = ffi.cast('bool*', 0x1a1f191)
 df.updatelightstate = ffi.cast('bool*', 0x1a1f190)
+
+-- hmm for namespace's sake ... I'll do this ... so the enums will be accessible by the df table ...
+-- but it will throw in a lot of other things too, like libc ...
+-- makes me with luajit allowed namespace-specification for their ffi / ctypes / enums / etc
 
 return df

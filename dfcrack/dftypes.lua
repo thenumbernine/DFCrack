@@ -9,9 +9,13 @@ or maybe autogen a gdb script to run on vanilla dfhack -g ?
 local ffi = require 'ffi'
 local template = require 'template'
 
-local function asserteq(a,b)
-	if a == b then return true end
-	error('expected '..tostring(a)..' == '..tostring(b))
+local asserteq = require 'asserteq'
+
+-- I do this often enough, here's its own function
+local function assertsizeof(t, s)
+	if ffi.sizeof(t) ~= s then
+		error("expected sizeof("..t..") == "..s..", but found "..ffi.sizeof(t))
+	end
 end
 
 local vec2s = require 'vec-ffi.vec2s'
@@ -51,7 +55,7 @@ typedef struct vector_bool {
 	uint8_t * idk[4];
 } vector_bool;
 ]]
-asserteq(ffi.sizeof'vector_bool', 40)
+assertsizeof('vector_bool', 40)
 
 -- 'T' is the ptr base type
 local function makeStdVectorPtr(T, name)
@@ -678,20 +682,56 @@ enum {
 
 ffi.cdef[[
 typedef struct LanguageName {
-	std_string first_name;
+	std_string firstName;
 	std_string nickname;
 	int32_t words[7];
-	PartOfSpeech parts_of_speech[7]; /* PartOfSpeech_* */
+	PartOfSpeech partsOfSpeech[7]; /* PartOfSpeech_* */
 	int32_t language;
 	LanguageNameType type;	/* LanguageNameType_* */
 	bool hasName;
 } LanguageName;
 ]]
+assertsizeof('LanguageName', 72)
+
+-- language_word_flags.h
+
+ffi.cdef[[
+typedef union LanguageWordFlags {
+	uint32_t flags;
+	struct {
+		uint32_t frontCompoundNounSing : 1;
+		uint32_t frontCompoundNounPlur : 1;
+		uint32_t frontCompoundAdj : 1;
+		uint32_t frontCompoundPrefix : 1;
+		uint32_t rearCompoundNounSing : 1;
+		uint32_t rearCompoundNounPlur : 1;
+		uint32_t rearCompoundAdj : 1;
+		uint32_t theNounSing : 1;
+		uint32_t theNounPlur : 1;
+		uint32_t theCompoundNounSing : 1;
+		uint32_t theCompoundNounPlur : 1;
+		uint32_t theCompoundAdj : 1;
+		uint32_t theCompoundPrefix : 1;
+		uint32_t ofNounSing : 1;
+		uint32_t ofNounPlur : 1;
+		uint32_t standard_verb : 1;
+	};
+} LanguageWordFlags;
+]]
 
 -- language_word.h
 
--- TODO
-ffi.cdef'typedef struct LanguageWord LanguageWord;'
+ffi.cdef[[
+typedef struct LanguageWord {
+	std_string word;
+	std_string forms[9];
+	uint8_t adj_dist;
+	char pad_1[7]; /*!< looks like garbage */
+	LanguageWordFlags flags;
+	vector_string_ptr str; /*!< since v0.40.01 */
+} LanguageWord;
+]]
+assertsizeof('LanguageWord', 120)
 makeStdVectorPtr'LanguageWord'
 
 -- language_symbol.h
@@ -702,8 +742,17 @@ makeStdVectorPtr'LanguageSymbol'
 
 -- language_translation.h
 
--- TODO
-ffi.cdef'typedef struct LanguageTranslation LanguageTranslation;'
+ffi.cdef[[
+typedef struct LanguageTranslation {
+	std_string name;
+	vector_string_ptr unknown1; /*!< looks like english words */
+	vector_string_ptr unknown2; /*!< looks like translated words */
+	vector_string_ptr words;
+	int32_t flags; /*!< since v0.40.01; 1 = generated */
+	vector_string_ptr str; /*!< since v0.40.01 */
+} LanguageTranslation;
+]]
+assertsizeof('LanguageTranslation', 112)
 makeStdVectorPtr'LanguageTranslation'
 
 -- language_word_table.h
@@ -714,6 +763,7 @@ typedef struct LanguageWordTable {
 	vector_int32 parts[6]; /* PartOfSpeech_* */
 } LanguageWordTable;
 ]]
+assertsizeof('LanguageWordTable', 288)
 
 -- item_type.h
 
@@ -1477,7 +1527,7 @@ typedef struct CreatureInteraction {
 	int32_t wait_period;
 } CreatureInteraction;
 ]]
-asserteq(ffi.sizeof'CreatureInteraction', 408)
+assertsizeof('CreatureInteraction', 408)
 
 -- body_part_raw.h
 
@@ -1556,12 +1606,12 @@ typedef struct CasteBodyInfo {
 	int32_t unk_v40_2[11]; /*!< since v0.40.01 */
 } CasteBodyInfo;
 ]]
-asserteq(ffi.sizeof'CasteBodyInfo', 464)
+assertsizeof('CasteBodyInfo', 464)
 
 -- unit_attribute.h
 
 ffi.cdef[[
-typedef struct {    
+typedef struct {
 	int32_t value; /*!< effective = value - softDemotion */
 	int32_t maxValue;
 	int32_t improveCounter; /*!< counts to PHYS_ATT_RATES improve cost; then value++ */
@@ -1848,7 +1898,7 @@ typedef struct {
 	int16_t unk_7;
 } UnitStatusUnknown1;
 ]]
-makeStdVectorPtr'UnitStatusUnknown1' 
+makeStdVectorPtr'UnitStatusUnknown1'
 
 ffi.cdef[[
 typedef struct {
@@ -2119,7 +2169,7 @@ struct Unit {
 		int32_t moodTimeout; /*!< counts down from 50000, insanity upon reaching zero */
 		int32_t unk_39c;
 	} job;
-	
+
 	struct {
 		BodyComponentInfo components;
 		vector_UnitWound_ptr wounds;
@@ -2134,7 +2184,7 @@ struct Unit {
 		int32_t infectionLevel; /*!< GETS_INFECTIONS_FROM_ROT sets; DISEASE_RESISTANCE reduces; >=300 causes bleeding */
 		vector_Spatter_ptr spatters;
 	} body;
-	
+
 	struct {
 		vector_int32 body_modifiers;
 		vector_int32 bp_modifiers;
@@ -2147,10 +2197,10 @@ struct Unit {
 		UnitGenes genes;
 		vector_int32 colors;
 	} appearance;
-	
+
 	vector_UnitAction_ptr actions;
 	int32_t nextActionID;
-	
+
 	struct Unit_Counters {
 		int32_t thinkCounter;
 		int32_t jobCounter;
@@ -2170,7 +2220,7 @@ struct Unit {
 		uint32_t nausea;
 		uint32_t dizziness;
 	} counters;
-	
+
 	struct Unit_Curse {
 		int32_t unk_0; /*!< moved from end of counters in 0.43.05 */
 		CIEAddTagMask1 addTags1;
@@ -2199,7 +2249,7 @@ struct Unit {
 		vector_int32 own_interaction; /*!< since v0.34.01 */
 		vector_int32 own_interaction_delay; /*!< since v0.34.01 */
 	} curse;
-	
+
 	struct {
 		uint32_t paralysis;
 		uint32_t numbness;
@@ -2213,7 +2263,7 @@ struct Unit {
 		uint32_t vomitTimeout; /*!< blocks nausea causing vomit */
 		uint32_t storedFat; /*!< hunger leads to death only when 0 */
 	} counters2;
-	
+
 	struct {
 		vector_UnitMiscTrait_ptr miscTraits;
 		struct {
@@ -2257,7 +2307,7 @@ struct Unit {
 		Coord recent_job_area;
 		CoordPath recent_jobs;
 	} status;
-	
+
 	int32_t histFigureID;
 	int32_t histFigureID2; /*!< used for ghost in AttackedByDead thought */
 	struct {
@@ -2273,27 +2323,27 @@ struct Unit {
 		uint8_t liquidDepth;
 		int32_t histEventColID; /*!< linked to an active invasion or kidnapping */
 	} status2;
-	
+
 	struct {
 		vector_int32 unk_7c4;
 		vector_int32 unk_c; /*!< since v0.34.01 */
 	} unknown7;
-	
+
 	struct {
 		vector_UnitSyndrome_ptr active;
 		vector_int32 reinfectionType;
 		vector_int16 reinfectionCount;
 	} syndromes;
-	
+
 	struct {
 		vector_int32 log[3];
 		int32_t last_year[3];
 		int32_t last_year_tick[3];
 	} reports;
-	
+
 	UnitHealthInfo * health;
 	vector_UnitItemUse_ptr usedItems; /*!< Contains worn clothes, armor, weapons, arrows fired by archers */
-	
+
 	struct {
 		vector_int32 sound_cooldown; /*!< since v0.34.01 */
 		struct {
@@ -2308,7 +2358,7 @@ struct Unit {
 			int32_t unk_v43_1; /*!< since v0.43.01 */
 			int32_t unk_v43_2; /*!< since v0.43.01 */
 		} * undead; /*!< since v0.34.01 */
-		
+
 		int32_t wereRace;
 		int32_t wereCaste;
 		int32_t normalRace;
@@ -2325,7 +2375,7 @@ struct Unit {
 		int32_t unk_v40_1e[10]; /*!< since v0.40.01; unused elements probably uninitialized */
 		int32_t unk_unit_id_2[200]; /*!< since v0.40.01; Seen own side, enemy side, not involved (witnesses?). Unused fields not cleared */
 		int32_t unk_unit_id_2_count; /*!< since v0.40.01 */
-		
+
 		struct {
 			int32_t unk_1;
 			int32_t unk_2;
@@ -2343,7 +2393,7 @@ struct Unit {
 				int32_t unk_10; /*!< not saved */
 			} unk;
 		} * unk_448; /*!< since v0.40.01 */
-		
+
 		struct {
 			int32_t unk_1;
 			int32_t unk_2;
@@ -2358,11 +2408,11 @@ struct Unit {
 			int32_t unk_11;
 			int32_t unk_12;
 		} * unk_44c; /*!< since v0.40.01 */
-		
+
 		int32_t unk_450; /*!< since v0.40.01 */
 		int32_t unk_454; /*!< since v0.40.01 */
 		int32_t army_controllerID; /*!< since v0.40.01 */
-		
+
 		/**
 		 * Since v0.40.01
 		 */
@@ -2412,7 +2462,7 @@ struct Unit {
 		vector_int32 unk_8e8;
 		vector_uint16 unk_8f8;
 	} enemy;
-	
+
 	vector_int32 healing_rate;
 	int32_t effective_rate;
 	int32_t tendons_heal;
@@ -3216,7 +3266,7 @@ struct HistfigEntityLink {
     int16_t linkStrength;
 };
 ]]
-asserteq(ffi.sizeof'HistfigEntityLink', 16)
+assertsizeof('HistfigEntityLink', 16)
 makeStdVectorPtr'HistfigEntityLink'
 
 -- histfig_site_link.h
@@ -3386,7 +3436,7 @@ asserteq(ffi.offsetof('HistoricalFigure', 'orientationFlags'), 8)
 asserteq(ffi.offsetof('HistoricalFigure', 'appearedYear'), 0xc)
 asserteq(ffi.offsetof('HistoricalFigure', 'name'), 0x38)
 asserteq(ffi.offsetof('HistoricalFigure', 'unk_fc'), 0x128)
-asserteq(ffi.sizeof'HistoricalFigure', 328)
+assertsizeof('HistoricalFigure', 328)
 makeStdVectorPtr'HistoricalFigure'
 
 -- world_region_details.h
@@ -4083,7 +4133,7 @@ typedef struct CasteRaw {
 	vector_int16 sense_creature_class_5;
 } CasteRaw;
 ]]
-asserteq(ffi.sizeof'CasteRaw', 9264)
+assertsizeof('CasteRaw', 9264)
 makeStdVectorPtr'CasteRaw'
 
 -- material.h
@@ -4169,7 +4219,7 @@ typedef struct CreatureRaw {
 	vector_string_ptr raws;
 } CreatureRaw;
 ]]
-asserteq(ffi.sizeof'CreatureRaw', 11744)
+assertsizeof('CreatureRaw', 11744)
 makeStdVectorPtr'CreatureRaw'
 
 -- creature_handler.h
@@ -4284,7 +4334,7 @@ typedef struct {
 makeStdVectorPtr'WorldRawsBodyGlosses'
 
 ffi.cdef[[
-typedef struct {
+typedef struct WorldRaws {
 	vector_MaterialTemplate_ptr materialTemplates;
 	vector_InorganicRaw_ptr inorganics;
 	vector_InorganicRaw_ptr inorganicsSubset; /*!< all inorganics with value less than 4 */
@@ -4368,7 +4418,7 @@ typedef struct {
 		vector_int32 interactions;
 		vector_Syndrome_ptr all; /*!< since v0.34.01 */
 	} syndromes;
-	
+
 	struct {
 		/* first two fields match MaterialVecRef*/
 		/* first three fields matches syndromes*/
@@ -6043,7 +6093,7 @@ asserteq(ffi.offsetof('World', 'allowAnnouncements'), 0x2693a8)
 asserteq(ffi.offsetof('World', 'unknown_26a9a9'), 0x2693a9)
 asserteq(ffi.offsetof('World', 'unknown_26a9aa'), 0x2693aa)
 asserteq(ffi.offsetof('World', 'arenaSpawn'), 0x2693b0)
-asserteq(ffi.sizeof'World', 2534184)
+assertsizeof('World', 2534184)
 
 -- caravan_state.h
 
@@ -6144,7 +6194,7 @@ typedef struct EntityActivityStatistics {
 	} found_misc;
 } EntityActivityStatistics;
 ]]
-asserteq(ffi.sizeof'EntityActivityStatistics', 8400)
+assertsizeof('EntityActivityStatistics', 8400)
 
 -- meeting_event.h
 
@@ -6735,7 +6785,7 @@ typedef struct NemesisOffload {
 ]]
 
 -- ui.h
--- TODO is this ... on the UI thread?  because ... 
+-- TODO is this ... on the UI thread?  because ...
 
 ffi.cdef[[
 typedef int16_t UI_Nobles_BookkeeperSettings;
@@ -7162,7 +7212,152 @@ typedef struct UI {
 	vector_bool available_seeds;
 } UI;
 ]]
-asserteq(ffi.sizeof'UI', 35744)
+assertsizeof('UI', 35744)
+
+-- d_init_nickname.h
+
+ffi.cdef[[
+typedef int32_t DInitNickname;
+enum {
+	DInitNickname_REPLACE_FIRST, // 0, 0x0
+	DInitNickname_CENTRALIZE, // 1, 0x1
+	DInitNickname_REPLACE_ALL, // 2, 0x2
+};
+]]
+
+-- d_init_idlers.h
+
+ffi.cdef[[
+typedef int16_t DInitIdlers;
+enum {
+	DInitIdlers_OFF = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	DInitIdlers_TOP, // 0, 0x0
+	DInitIdlers_BOTTOM, // 1, 0x1
+};
+]]
+
+-- d_init_tunnel.h
+
+ffi.cdef[[
+typedef int16_t DInitTunnel;
+enum {
+	DInitTunnel_NO, // 0, 0x0
+	DInitTunnel_FINDER, // 1, 0x1
+	DInitTunnel_ALWAYS, // 2, 0x2
+};
+]]
+
+-- d_init_z_view.h
+
+ffi.cdef[[
+typedef int32_t DInitZView;
+enum {
+	DInitZView_OFF, // 0, 0x0
+	DInitZView_UNHIDDEN, // 1, 0x1
+	DInitZView_CREATURE, // 2, 0x2
+	DInitZView_ON, // 3, 0x3
+};
+]]
+
+-- d_init_embark_confirm.h
+
+ffi.cdef[[
+typedef int32_t DInitEmbarkConfirm;
+enum {
+	DInitEmbarkConfirm_ALWAYS, // 0, 0x0
+	DInitEmbarkConfirm_IF_POINTS_REMAIN, // 1, 0x1
+	DInitEmbarkConfirm_NO, // 2, 0x2
+};
+]]
+
+-- announcement_flags.h
+
+ffi.cdef[[
+typedef union AnnouncementFlags {
+	uint32_t flags;
+	struct {
+		uint32_t DO_MEGA : 1; /*!< BOX */
+		uint32_t PAUSE : 1; /*!< P */
+		uint32_t RECENTER : 1; /*!< R */
+		uint32_t A_DISPLAY : 1; /*!< A_D */
+		uint32_t D_DISPLAY : 1; /*!< D_D */
+		uint32_t UNIT_COMBAT_REPORT : 1; /*!< UCR */
+		uint32_t UNIT_COMBAT_REPORT_ALL_ACTIVE : 1; /*!< UCR_A */
+	};
+} AnnouncementFlags;
+]]
+
+-- announcements.h
+
+ffi.cdef[[
+typedef struct Announcements {
+	AnnouncementFlags flags[339];
+	void * unused;
+} Announcements;
+]]
+assertsizeof('Announcements', 1368)
+
+-- d_init.h
+
+ffi.cdef[[
+typedef struct DInit {
+	DFBitArray/*DInitFlags1*/ flags1;
+	DInitNickname nickname[10];
+	uint8_t sky_tile;
+	int16_t sky_color[3];
+	uint8_t chasm_tile;
+	uint8_t pillar_tile;
+	uint8_t track_tiles[15]; /*!< since v0.34.08 */
+	uint8_t track_tile_invert[15]; /*!< since v0.34.08 */
+	uint8_t track_ramp_tiles[15]; /*!< since v0.34.08 */
+	uint8_t track_ramp_invert[15]; /*!< since v0.34.08 */
+	uint8_t tree_tiles[104]; /*!< since v0.40.01 */
+	int16_t chasm_color[3];
+	struct {
+		int16_t none[3];
+		int16_t minor[3];
+		int16_t inhibited[3];
+		int16_t function_loss[3];
+		int16_t broken[3];
+		int16_t missing[3];
+	} wound_color;
+	DInitIdlers idlers;
+	DInitTunnel show_embark_tunnel;
+	DFBitArray/*DInitFlags2*/ flags2;
+	int32_t display_length;
+	DInitZView adventurer_z_view;
+	int32_t adventurer_z_view_size;
+	DFBitArray/*DInitFlags3*/ flags3;
+	int32_t population_cap;
+	int32_t strict_population_cap;
+	int32_t baby_cap_absolute;
+	int32_t baby_cap_percent;
+	int32_t visitor_cap;
+	int32_t specific_seed_cap;
+	int32_t fortress_seed_cap;
+	int32_t invasion_soldier_cap[3];
+	int32_t invasion_monster_cap[3];
+	int32_t path_cost[4];
+	int16_t embark_rect[2];
+	struct {
+		int16_t item_decrease;
+		int16_t seed_combine;
+		int16_t bucket_combine;
+		int16_t barrel_combine;
+		int16_t bin_combine;
+	} store_dist;
+	int16_t set_labor_lists[2];
+	int32_t graze_coefficient; /*!< since v0.40.13 */
+	int32_t temple_value_levels[2]; /*!< since v0.47.01 */
+	int32_t priesthood_unit_counts[2]; /*!< since v0.47.01 */
+	int32_t guildhall_value_levels[2]; /*!< since v0.47.01 */
+	int32_t guild_unit_counts[2]; /*!< since v0.47.01 */
+	DFBitArray/*DInitFlags4*/ flags4;
+	DInitEmbarkConfirm post_prepare_embark_confirmation;
+	Announcements announcements;
+} DInit;
+]]
+assertsizeof('DInit', 1848)
 
 -- global_objects.h
 

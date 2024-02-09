@@ -31,19 +31,29 @@ local function makeStdVector(T, name)
 			function mt:size()
 				return self.finish - self.start
 			end
-			
+
 			function mt:capacity()
 				return self.endOfStorage - self.start
 			end
-			
+
 			-- safe access
+			-- returns ref for cdata or value for primitives (which means doesn't work for writing)
 			function mt:at(i)
 				if i < 0 or i >= self.finish - self.start then
-					return nil, 'out of bounds' 
+					return nil, 'out of bounds'
 				end
-				-- in C++ this would return a reference ...
+				return self.start[i]
+			end
+
+			-- safe access
+			-- since there's no refs in luajit, here's a ptr version
+			function mt:atPtr(i)
+				if i < 0 or i >= self.finish - self.start then
+					return nil, 'out of bounds'
+				end
 				return self.start + i
 			end
+
 
 			function mt:__ipairs()
 				-- slow impl

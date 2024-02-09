@@ -1,5 +1,5 @@
 --[[
-main entry point
+main entry point of the UI thread
 called by the lua state that is run on the main/event thread (SDL_Init, SDL_Quit, SDL_PollEvent)
 --]]
 
