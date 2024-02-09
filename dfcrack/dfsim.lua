@@ -57,7 +57,46 @@ function dfsim.update()
 		if not haveRunFastDwarf then
 			haveRunFastDwarf = true
 			for i,u in ipairs(df.world.units.active) do
-				print('unit', i, u, u:isCitizen())
+				print('unit',
+					i,
+					u,
+
+					'is citizen?', u:isCitizen(),
+					
+					-- did I have Lua bool rw worked out for bitfields in my ff6 hacking project?
+					
+					"if any are set then we're not a citizen",
+					u.marauder ~= 0,
+					u.invaderOrigin ~= 0,
+					u.activeInvader ~= 0,
+					u.activeInvader ~= 0,
+					u.forest ~= 0,
+					u.merchant ~= 0,
+					u.diplomat ~= 0,
+					u.visitor ~= 0,
+					u.visitorUninvited ~= 0,
+					u.underworld ~= 0,
+					u.resident ~= 0,
+
+					"isSane?", u:isSane(),
+					"isDead?", u:isDead(),
+					"isOpposedToLife?", u:isOpposedToLife(),
+					"curse.removeTags1.OPPOSED_TO_LIFE", u.curse.removeTags1.OPPOSED_TO_LIFE ~= 0,
+					"curse.addTags1.OPPOSED_TO_LIFE", u.curse.addTags1.OPPOSED_TO_LIFE ~= 0,
+					"casteFlagSet(CasteRawFlags_OPPOSED_TO_LIFE)", u:casteFlagSet(ffi.C.CasteRawFlags_OPPOSED_TO_LIFE),
+					"enemy.undead", u.enemy.undead,
+					"enemy.normalRace", u.enemy.normalRace,
+					"enemy.wereRace", u.enemy.wereRace,
+					"isCrazed?", u:isCrazed(),
+					"scuttle", u.scuttle,
+					"curse.removeTags1.CRAZED", u.curse.removeTags1.CRAZED ~= 0,
+					"curse.addTags1.CRAZED", u.curse.addTags1.CRAZED ~= 0,
+					"casteFlagSet(ffi.C.CasteRawFlags_CRAZED)", u:casteFlagSet(ffi.C.CasteRawFlags_CRAZED),
+					"mood", u.mood,
+					"isOwnGroup?", u:isOwnGroup(),
+					"histFigureID", u.histFigureID,
+					"histfig", df.HistoricalFigure.find(u.histFigureID)
+				)
 			end
 		end
 	else

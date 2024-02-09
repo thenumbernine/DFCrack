@@ -41,16 +41,7 @@ do
 	df.CreatureRaw = ffi.metatype('CreatureRaw', mt)
 end
 
--- HistoricalFigureEntityLink
-do
-	local mt = {}
-	mt.__index = mt
-
-	df.HistfigEntityLink = ffi.metatype('HistfigEntityLink', mt)
-end
-
-
--- HistoricalFigure
+-- HistfigEntityLink
 do
 	local mt = {}
 	mt.__index = mt
@@ -61,6 +52,15 @@ do
 	end
 	--]]
 	
+	df.HistfigEntityLink = ffi.metatype('HistfigEntityLink', mt)
+end
+
+
+-- HistoricalFigure
+do
+	local mt = {}
+	mt.__index = mt
+
 	-- static method
 	function mt.getVectorPtr()
 		-- of type vector_HistoricalFigure_ptr
@@ -98,7 +98,7 @@ do
 		caste = caste or self.caste
 --print('CreatureRaw:casteFlagSet', flagIndex, race, caste)
 	
-		local creature = df.CreatureRaw.find(race);
+		local creature = df.CreatureRaw.find(race)
 		-- 'creature' is df.world[0].raws.creatures.all[] vector entry, which is a CreatureRaw*
 		-- need explicit nil test to detect null pointer cdata
 --print('creature', creature)
@@ -135,7 +135,7 @@ do
 			return false
 		end
 
-		if not (ignoreSanity or self:isSane()) then
+		if not ignoreSanity and not self:isSane() then
 			return false
 		end
 
@@ -151,7 +151,7 @@ do
 	function mt:isSane()
 		if self:isDead() 
 		or self:isOpposedToLife() 
-		or self.enemy.undead
+		or self.enemy.undead ~= nil	-- cuz it's a pointer ...
 		then
 			return false
 		end
@@ -180,11 +180,11 @@ do
 	end
 
 	function mt:isOwnGroup()
-		local histfig = df.HistoricalFigure.find(unit.historicFigureID);
+		local histfig = df.HistoricalFigure.find(self.histFigureID)
 		if histfig == nil or histfig[0] == nil then return false end
 		for i,link in ipairs(histfig[0].entityLinks) do
-			if link.entityID == ui.groupID 
-			and link:getType() == HistfigEntityLinkType_MEMBER
+			if link.entityID == df.ui.groupID 
+			and link:getType() == ffi.C.HistfigEntityLinkType_MEMBER
 			then
 				return true
 			end

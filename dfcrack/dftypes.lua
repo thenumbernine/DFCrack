@@ -30,8 +30,7 @@ local makeStdVector = require 'std.vector'
 local makeList = require 'list'
 local makeDfArray = require 'dfarray'
 
-makeStdVector('void*', 'vector_ptr')
-makeStdVector('char*', 'vector_char_ptr')
+makeStdVector('char', 'vector_char')
 makeStdVector('int8_t', 'vector_int8')
 makeStdVector('uint8_t', 'vector_uint8')
 makeStdVector('short', 'vector_int16')
@@ -39,6 +38,9 @@ makeStdVector('unsigned short', 'vector_uint16')
 makeStdVector('int', 'vector_int32')
 makeStdVector('unsigned int', 'vector_uint32')
 makeStdVector('std_string', 'vector_string')
+
+makeStdVector('void*', 'vector_ptr')
+makeStdVector('char*', 'vector_char_ptr')
 
 -- TODO WTF WHO USES BOOL VECTOR?!?!?!??!
 -- this is guaranteed to be broken.  at best, array size is >>3 the vector size
@@ -149,6 +151,11 @@ struct BlockBurrow {
 	list_BlockBurrow * link;
 };
 ]]
+
+-- burrow.h
+
+ffi.cdef'typedef struct Burrow Burrow;'
+makeStdVectorPtr'Burrow'
 
 -- general_ref.h
 
@@ -1415,7 +1422,7 @@ enum {
 -- creature_interaction_target_flags.h
 
 ffi.cdef[[
-typedef struct CreatureInteractionTargetFlags {
+typedef union CreatureInteractionTargetFlags {
 	uint32_t flags;
 	struct {
 		uint32_t LINE_OF_SIGHT : 1;
@@ -2193,7 +2200,7 @@ struct Unit {
 		vector_int32 own_interaction_delay; /*!< since v0.34.01 */
 	} curse;
 	
-	struct T_counters2 {
+	struct {
 		uint32_t paralysis;
 		uint32_t numbness;
 		uint32_t fever;
@@ -3003,7 +3010,7 @@ makeStdVectorPtr'BlockSquareEventSpoorst'
 -- orientation_flags.h
 
 ffi.cdef[[
-typedef struct OrientationFlags {
+typedef union OrientationFlags {
 	uint32_t flags;
 	struct {
 		uint32_t indeterminate : 1; /*!< only seen on adventurers */
@@ -3209,6 +3216,7 @@ struct HistfigEntityLink {
     int16_t linkStrength;
 };
 ]]
+asserteq(ffi.sizeof'HistfigEntityLink', 16)
 makeStdVectorPtr'HistfigEntityLink'
 
 -- histfig_site_link.h
@@ -3307,17 +3315,17 @@ struct HistoricalFigure {
 	int16_t caste;
 	Gender sex;
 	OrientationFlags orientationFlags;
-	int32_t appeared_year;
-	int32_t born_year;
-	int32_t born_seconds;
-	int32_t curse_year; /*!< since v0.34.01 */
-	int32_t curse_seconds; /*!< since v0.34.01 */
-	int32_t birth_year_bias; /*!< since v0.34.01 */
-	int32_t birth_time_bias; /*!< since v0.34.01 */
-	int32_t old_year;
-	int32_t old_seconds;
-	int32_t died_year;
-	int32_t died_seconds;
+	int32_t appearedYear;
+	int32_t bornYear;
+	int32_t bornSeconds;
+	int32_t curseYear; /*!< since v0.34.01 */
+	int32_t curseSeconds; /*!< since v0.34.01 */
+	int32_t birthYearBias; /*!< since v0.34.01 */
+	int32_t birthTimeBias; /*!< since v0.34.01 */
+	int32_t oldYear;
+	int32_t oldSeconds;
+	int32_t diedYear;
+	int32_t diedSeconds;
 	LanguageName name;
 	int32_t civID;
 	int32_t populationID;
@@ -3369,6 +3377,16 @@ struct HistoricalFigure {
 	int32_t unk_5;
 } HistoricalFigure;
 ]]
+
+asserteq(ffi.offsetof('HistoricalFigure', 'profession'), 0)
+asserteq(ffi.offsetof('HistoricalFigure', 'race'), 2)
+asserteq(ffi.offsetof('HistoricalFigure', 'caste'), 4)
+asserteq(ffi.offsetof('HistoricalFigure', 'sex'), 6)
+asserteq(ffi.offsetof('HistoricalFigure', 'orientationFlags'), 8)
+asserteq(ffi.offsetof('HistoricalFigure', 'appearedYear'), 0xc)
+asserteq(ffi.offsetof('HistoricalFigure', 'name'), 0x38)
+asserteq(ffi.offsetof('HistoricalFigure', 'unk_fc'), 0x128)
+asserteq(ffi.sizeof'HistoricalFigure', 328)
 makeStdVectorPtr'HistoricalFigure'
 
 -- world_region_details.h
@@ -6021,16 +6039,1132 @@ asserteq(ffi.offsetof('World', 'worldgenStatus'), 0x1175e8)	-- good
 asserteq(ffi.offsetof('World', 'pathfinder'), 0x130928)	-- good
 asserteq(ffi.offsetof('World', 'features'), 0x2691a0)	-- good
 asserteq(ffi.cast('size_t', ffi.cast('void*', ffi.cast('World*', 0).features.unk_15)), 0x269380)
-
--- seems I'm missing 1 field ...
 asserteq(ffi.offsetof('World', 'allowAnnouncements'), 0x2693a8)
 asserteq(ffi.offsetof('World', 'unknown_26a9a9'), 0x2693a9)
 asserteq(ffi.offsetof('World', 'unknown_26a9aa'), 0x2693aa)
 asserteq(ffi.offsetof('World', 'arenaSpawn'), 0x2693b0)
 asserteq(ffi.sizeof'World', 2534184)
 
--- global_objects.h
+-- caravan_state.h
 
+ffi.cdef'typedef struct CaravanState CaravanState;'
+makeStdVectorPtr'CaravanState'
+
+-- activity_info.h
+
+makeStdVectorPtr'ActivityInfo'
+
+-- entity_sell_requests.h
+
+ffi.cdef'typedef struct EntitySellRequests EntitySellRequests;'
+
+-- entity_buy_requests.h
+
+ffi.cdef'typedef struct EntityBuyRequests EntityBuyRequests;'
+
+-- dipscript_info.h
+
+ffi.cdef'typedef struct DipScriptInfo DipScriptInfo;'
+makeStdVectorPtr'DipScriptInfo'
+
+-- dipscript_popup.h
+
+ffi.cdef'typedef struct DipScriptPopup DipScriptPopup;'
+makeStdVectorPtr'DipScriptPopup'
+
+-- active_script_varst.h
+
+ffi.cdef'typedef struct ActiveScriptVarst ActiveScriptVarst;'
+makeStdVectorPtr'ActiveScriptVarst'
+
+-- entity_activity_statistics.h
+
+ffi.cdef[[
+typedef struct EntityActivityStatistics {
+	struct {
+		int32_t total;
+		int32_t meat;
+		int32_t fish;
+		int32_t other;
+		int32_t seeds;
+		int32_t plant;
+		int32_t drink;
+	} food;
+	int16_t unit_counts[152];
+	int16_t population;
+	int16_t unk_1;
+	int16_t unk_2; /*!< in 0.23, omnivores */
+	int16_t unk_3; /*!< in 0.23, carnivores */
+	int16_t trained_animals;
+	int16_t other_animals;
+	int16_t unk_4; /*!< in 0.23, potential soldiers */
+	int32_t unk_5; /*!< in 0.23, combat aptitude */
+	int32_t item_counts[112];
+	vector_int32 created_weapons;
+	struct {
+		int32_t total;
+		int32_t weapons;
+		int32_t armor;
+		int32_t furniture;
+		int32_t other;
+		int32_t architecture;
+		int32_t displayed;
+		int32_t held;
+		int32_t imported;
+		int32_t unk_1;
+		int32_t exported;
+	} wealth;
+	int32_t recent_jobs[7][260];
+	int32_t excavated_tiles; /*!< unhidden, subterranean, and excluding map features */
+	int32_t death_history[5];
+	int32_t insanity_history[5];
+	int32_t execution_history[5];
+	int32_t noble_death_history[5];
+	int32_t total_deaths;
+	int32_t total_insanities;
+	int32_t total_executions;
+	int32_t num_artifacts;
+	int32_t unk_6; /*!< in 0.23, total siegers */
+	vector_char discovered_creature_foods;
+	vector_char discovered_creatures;
+	vector_char discovered_plant_foods;
+	vector_char discovered_plants; /*!< allows planting of seeds */
+	int16_t discovered_water_features;
+	int16_t discovered_subterranean_features;
+	int16_t discovered_chasm_features; /*!< unused since 40d */
+	int16_t discovered_magma_features;
+	int16_t discovered_feature_layers; /*!< back in 40d, this counted HFS */
+	int32_t migrant_wave_idx; /*!< when >= 2, no migrants */
+	vector_int32 found_minerals; /*!< Added after 'you have struck' announcement */
+	union {
+		uint32_t flags;
+		struct {
+			uint32_t deep_special : 1;
+		};
+	} found_misc;
+} EntityActivityStatistics;
+]]
+asserteq(ffi.sizeof'EntityActivityStatistics', 8400)
+
+-- meeting_event.h
+
+ffi.cdef'typedef struct MeetingEvent MeetingEvent;'
+makeStdVectorPtr'MeetingEvent'
+
+-- meeting_topic.h
+
+ffi.cdef[[
+typedef int16_t MeetingTopic;
+enum {
+	MeetingTopic_DiscussCurrent, // 0, 0x0
+	MeetingTopic_RequestPeace, // 1, 0x1
+	MeetingTopic_TreeQuota, // 2, 0x2
+	MeetingTopic_BecomeLandHolder, // 3, 0x3
+	MeetingTopic_PromoteLandHolder, // 4, 0x4
+	MeetingTopic_ExportAgreement, // 5, 0x5
+	MeetingTopic_ImportAgreement, // 6, 0x6
+	MeetingTopic_PleasantPlace, // 7, 0x7
+	MeetingTopic_WorldStatus, // 8, 0x8
+	MeetingTopic_TributeAgreement, // 9, 0x9
+};
+typedef vector_int16 vector_MeetingTopic;
+]]
+
+-- meeting_diplomat_info.h
+
+ffi.cdef[[
+typedef struct MeetingDiplomatInfo {
+	int32_t civ_id;
+	int16_t unk1; /*!< maybe is_first_contact */
+	int32_t diplomat_id;
+	int32_t associate_id;
+	vector_int32/*<enum_field<df::meeting_topic,int32_t>*/ topic_list;
+	vector_int32 topic_parms;
+	EntitySellRequests * sell_requests;
+	EntityBuyRequests* buy_requests;
+	DipScriptInfo * dipscript;
+	int32_t cur_step;
+	vector_ActiveScriptVarst_ptr active_script_vars;
+	std_string unk_50;
+	std_string unk_6c;
+	union {
+		uint32_t flags ;
+		struct {
+			uint32_t dynamic_load : 1; /*!< destroy dipscript_info in destructor */
+			uint32_t failure : 1;
+			uint32_t success : 1;
+		};
+	} flags;
+	vector_MeetingEvent_ptr events;
+	vector_int32 agreement_entity;
+	vector_MeetingTopic agreement_topic;
+	vector_int32 agreement_year;
+	vector_int32 agreement_tick;
+	vector_int16 agreement_outcome;
+	vector_int32 contact_entity;
+	vector_int32 contact_year;
+	vector_int32 contact_tick;
+} MeetingDiplomatInfo;
+]]
+makeStdVectorPtr'MeetingDiplomatInfo'
+
+-- invasion_info.h
+
+ffi.cdef'typedef struct InvasionInfo InvasionInfo;'
+makeStdVectorPtr'InvasionInfo'
+
+-- punishment.h
+
+ffi.cdef'typedef struct Punishment Punishment;'
+makeStdVectorPtr'Punishment'
+
+-- party_info.h
+
+ffi.cdef'typedef struct PartyInfo PartyInfo;'
+makeStdVectorPtr'PartyInfo'
+
+-- room_rent_info.h
+
+ffi.cdef'typedef struct RoomRentInfo RoomRentInfo;'
+makeStdVectorPtr'RoomRentInfo'
+
+-- kitchen_exc_type.h
+
+ffi.cdef[[
+typedef int8_t KitchenExcType;
+typedef vector_int8 vector_KitchenExcType;
+enum {
+	KitchenExcType_Cook = 1, // 1, 0x1
+	KitchenExcType_Brew, // 2, 0x2
+};
+]]
+
+-- entity_material_category.h
+
+ffi.cdef[[
+typedef int16_t EntityMaterialCategory;
+enum {
+	EntityMaterialCategory_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	/**
+	* cloth or leather
+	*/
+	EntityMaterialCategory_Clothing, // 0, 0x0
+	/**
+	* organic.leather
+	*/
+	EntityMaterialCategory_Leather, // 1, 0x1
+	/**
+	* any cloth
+	*/
+	EntityMaterialCategory_Cloth, // 2, 0x2
+	/**
+	* organic.wood, used for training weapons
+	*/
+	EntityMaterialCategory_Wood, // 3, 0x3
+	/**
+	* misc_mat.crafts
+	*/
+	EntityMaterialCategory_Crafts, // 4, 0x4
+	/**
+	* stones
+	*/
+	EntityMaterialCategory_Stone, // 5, 0x5
+	/**
+	* misc_mat.crafts
+	*/
+	EntityMaterialCategory_Improvement, // 6, 0x6
+	/**
+	* misc_mat.glass_unused, used for extract vials
+	*/
+	EntityMaterialCategory_Glass, // 7, 0x7
+	/**
+	* misc_mat.barrels, also used for buckets
+	*/
+	EntityMaterialCategory_Wood2, // 8, 0x8
+	/**
+	* cloth/leather
+	*/
+	EntityMaterialCategory_Bag, // 9, 0x9
+	/**
+	* misc_mat.cages
+	*/
+	EntityMaterialCategory_Cage, // 10, 0xA
+	/**
+	* metal.weapon
+	*/
+	EntityMaterialCategory_WeaponMelee, // 11, 0xB
+	/**
+	* metal.ranged
+	*/
+	EntityMaterialCategory_WeaponRanged, // 12, 0xC
+	/**
+	* metal.ammo
+	*/
+	EntityMaterialCategory_Ammo, // 13, 0xD
+	/**
+	* metal.ammo2
+	*/
+	EntityMaterialCategory_Ammo2, // 14, 0xE
+	/**
+	* metal.pick
+	*/
+	EntityMaterialCategory_Pick, // 15, 0xF
+	/**
+	* metal.armor, also used for shields, tools, instruments, and toys
+	*/
+	EntityMaterialCategory_Armor, // 16, 0x10
+	/**
+	* gems
+	*/
+	EntityMaterialCategory_Gem, // 17, 0x11
+	/**
+	* refuse.bone
+	*/
+	EntityMaterialCategory_Bone, // 18, 0x12
+	/**
+	* refuse.shell
+	*/
+	EntityMaterialCategory_Shell, // 19, 0x13
+	/**
+	* refuse.pearl
+	*/
+	EntityMaterialCategory_Pearl, // 20, 0x14
+	/**
+	* refuse.ivory
+	*/
+	EntityMaterialCategory_Ivory, // 21, 0x15
+	/**
+	* refuse.horn
+	*/
+	EntityMaterialCategory_Horn, // 22, 0x16
+	/**
+	* misc_mat.others
+	*/
+	EntityMaterialCategory_Other, // 23, 0x17
+	/**
+	* metal.anvil
+	*/
+	EntityMaterialCategory_Anvil, // 24, 0x18
+	/**
+	* misc_mat.booze
+	*/
+	EntityMaterialCategory_Booze, // 25, 0x19
+	/**
+	* metals with ITEMS_HARD, used for chains
+	*/
+	EntityMaterialCategory_Metal, // 26, 0x1A
+	/**
+	* organic.fiber
+	*/
+	EntityMaterialCategory_PlantFiber, // 27, 0x1B
+	/**
+	* organic.silk
+	*/
+	EntityMaterialCategory_Silk, // 28, 0x1C
+	/**
+	* organic.wool
+	*/
+	EntityMaterialCategory_Wool, // 29, 0x1D
+	/**
+	* misc_mat.rock_metal
+	*/
+	EntityMaterialCategory_Furniture, // 30, 0x1E
+	/**
+	* misc_mat.wood2
+	*/
+	EntityMaterialCategory_MiscWood2, // 31, 0x1F
+};
+]]
+
+-- item_filter_spec.h
+
+-- matches WorldItemTypes and HistoryHitItem
+ffi.cdef[[
+typedef struct ItemFilterSpec {
+	ItemType itemType;
+	int16_t itemSubType;
+	EntityMaterialCategory materialClass;
+	int16_t matType;
+	int32_t matIndex;
+} ItemFilterSpec;
+]]
+
+-- squad_ammo_spec.h
+
+ffi.cdef[[
+typedef struct SquadAmmoSpec {
+	ItemFilterSpec item_filter;
+	int32_t amount;
+	union {
+		uint32_t flags;
+		struct {
+			uint32_t use_combat : 1;
+			uint32_t use_training : 1;
+		};
+	};
+	vector_int32 assigned;
+} SquadAmmoSpec;
+]]
+makeStdVectorPtr'SquadAmmoSpec'
+
+-- season.h
+
+ffi.cdef[[
+typedef int8_t Season;
+typedef vector_int8 vector_Season;
+enum {
+	Season_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	Season_Spring, // 0, 0x0
+	Season_Summer, // 1, 0x1
+	Season_Autumn, // 2, 0x2
+	Season_Winter, // 3, 0x3
+};
+]]
+
+-- ghost_type.h
+
+ffi.cdef[[
+typedef int16_t GhostType;
+enum {
+	GhostType_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	GhostType_MurderousGhost, // 0, 0x0
+	GhostType_SadisticGhost, // 1, 0x1
+	GhostType_SecretivePoltergeist, // 2, 0x2
+	GhostType_EnergeticPoltergeist, // 3, 0x3
+	GhostType_AngryGhost, // 4, 0x4
+	GhostType_ViolentGhost, // 5, 0x5
+	GhostType_MoaningSpirit, // 6, 0x6
+	GhostType_HowlingSpirit, // 7, 0x7
+	GhostType_TroublesomePoltergeist, // 8, 0x8
+	GhostType_RestlessHaunt, // 9, 0x9
+	GhostType_ForlornHaunt, // 10, 0xA
+};
+]]
+
+-- stockpile_group_set.h
+
+ffi.cdef[[
+typedef struct StockpileGroupSet {
+	uint32_t flags;
+	struct {
+		uint32_t animals : 1;
+		uint32_t food : 1;
+		uint32_t furniture : 1;
+		uint32_t corpses : 1;
+		uint32_t refuse : 1;
+		uint32_t stone : 1;
+		uint32_t ammo : 1;
+		uint32_t coins : 1;
+		uint32_t bars_blocks : 1;
+		uint32_t gems : 1;
+		uint32_t finished_goods : 1;
+		uint32_t leather : 1;
+		uint32_t cloth : 1;
+		uint32_t wood : 1;
+		uint32_t weapons : 1;
+		uint32_t armor : 1;
+		uint32_t sheet : 1;
+	};
+} StockpileGroupSet;
+]]
+
+-- stockpile_settings.h
+
+ffi.cdef[[
+typedef struct StockpileSettings {
+	StockpileGroupSet flags;
+	struct {
+		bool empty_cages;
+		bool empty_traps;
+		vector_char enabled;
+	} animals;
+	struct {
+		vector_char meat;
+		vector_char fish;
+		vector_char unprepared_fish;
+		vector_char egg;
+		vector_char plants;
+		vector_char drink_plant;
+		vector_char drink_animal;
+		vector_char cheese_plant;
+		vector_char cheese_animal;
+		vector_char seeds;
+		vector_char leaves;
+		vector_char powder_plant;
+		vector_char powder_creature;
+		vector_char glob;
+		vector_char glob_paste;
+		vector_char glob_pressed;
+		vector_char liquid_plant;
+		vector_char liquid_animal;
+		vector_char liquid_misc;
+		bool prepared_meals;
+	} food;
+	struct {
+		vector_char type;
+		vector_char other_mats;
+		vector_char mats;
+		bool quality_core[7];
+		bool quality_total[7];
+	} furniture;
+	int32_t unk1;
+	struct {
+		vector_char type;
+		vector_char corpses;
+		vector_char body_parts;
+		vector_char skulls;
+		vector_char bones;
+		vector_char hair;
+		vector_char shells;
+		vector_char teeth;
+		vector_char horns;
+		bool fresh_raw_hide;
+		bool rotten_raw_hide;
+	} refuse;
+	struct {
+		vector_char mats;
+	} stone;
+	struct {
+		vector_char mats; /*!< unused */
+	} ore;
+	struct {
+		vector_char type;
+		vector_char other_mats;
+		vector_char mats;
+		bool quality_core[7];
+		bool quality_total[7];
+	} ammo;
+	struct {
+		vector_char mats;
+	} coins;
+	struct {
+		vector_char bars_other_mats;
+		vector_char blocks_other_mats;
+		vector_char bars_mats;
+		vector_char blocks_mats;
+	} bars_blocks;
+	struct {
+		vector_char rough_other_mats;
+		vector_char cut_other_mats;
+		vector_char rough_mats;
+		vector_char cut_mats;
+	} gems;
+	struct {
+		vector_char type;
+		vector_char other_mats;
+		vector_char mats;
+		bool quality_core[7];
+		bool quality_total[7];
+	} finished_goods;
+	struct {
+		vector_char mats;
+	} leather;
+	struct {
+		vector_char thread_silk;
+		vector_char thread_plant;
+		vector_char thread_yarn;
+		vector_char thread_metal;
+		vector_char cloth_silk;
+		vector_char cloth_plant;
+		vector_char cloth_yarn;
+		vector_char cloth_metal;
+	} cloth;
+	struct {
+		vector_char mats;
+	} wood;
+	struct {
+		vector_char weapon_type;
+		vector_char trapcomp_type;
+		vector_char other_mats;
+		vector_char mats;
+		bool quality_core[7];
+		bool quality_total[7];
+		bool usable;
+		bool unusable;
+	} weapons;
+	struct {
+		vector_char body;
+		vector_char head;
+		vector_char feet;
+		vector_char hands;
+		vector_char legs;
+		vector_char shield;
+		vector_char other_mats;
+		vector_char mats;
+		bool quality_core[7];
+		bool quality_total[7];
+		bool usable;
+		bool unusable;
+	} armor;
+	struct {
+		vector_char paper;
+		vector_char parchment;
+	} sheet;
+	bool allow_organic;
+	bool allow_inorganic;
+} StockpileSettings;
+]]
+
+-- training_assignment.h
+
+ffi.cdef'typedef struct TrainingAssignment TrainingAssignment;'
+makeStdVectorPtr'TrainingAssignment'
+
+-- hauling_route.h
+
+ffi.cdef'typedef struct HaulingRoute HaulingRoute;'
+makeStdVectorPtr'HaulingRoute'
+
+-- hauling_stop.h
+
+ffi.cdef'typedef struct HaulingStop HaulingStop;'
+makeStdVectorPtr'HaulingStop'
+
+-- stop_depart_condition.h
+
+ffi.cdef'typedef struct StopDepartCondition StopDepartCondition;'
+makeStdVectorPtr'StopDepartCondition'
+
+-- route_stockpile_link.h
+
+ffi.cdef'typedef struct RouteStockpileLink RouteStockpileLink;'
+makeStdVectorPtr'RouteStockpileLink'
+
+-- ui_hotkey.h
+
+ffi.cdef[[
+typedef int16_t UIHotKey_Cmd;
+enum {
+	UIHotKey_Cmd_None = -1, // -1, 0xFFFFFFFFFFFFFFFF
+	UIHotKey_Cmd_Zoom, // 0, 0x0
+	UIHotKey_Cmd_FollowUnit, // 1, 0x1
+	UIHotKey_Cmd_FollowItem, // 2, 0x2
+};
+]]
+
+ffi.cdef[[
+typedef struct UIHotKey {
+	std_string name;
+	UIHotKey_Cmd cmd;
+	int32_t x;
+	int32_t y;
+	int32_t z;
+	union {
+		int32_t unit_id; /*!< since v0.34.08 */
+		int32_t item_id; /*!< since v0.34.08 */
+	};
+} UIHotKey;
+]]
+
+-- ui_sidebar_mode.h
+
+ffi.cdef[[
+typedef int16_t UISideBarMode;
+enum {
+	UISideBarMode_Default, // 0, 0x0
+	UISideBarMode_Squads, // 1, 0x1
+	UISideBarMode_DesignateMine, // 2, 0x2
+	UISideBarMode_DesignateRemoveRamps, // 3, 0x3
+	UISideBarMode_DesignateUpStair, // 4, 0x4
+	UISideBarMode_DesignateDownStair, // 5, 0x5
+	UISideBarMode_DesignateUpDownStair, // 6, 0x6
+	UISideBarMode_DesignateUpRamp, // 7, 0x7
+	UISideBarMode_DesignateChannel, // 8, 0x8
+	UISideBarMode_DesignateGatherPlants, // 9, 0x9
+	UISideBarMode_DesignateRemoveDesignation, // 10, 0xA
+	UISideBarMode_DesignateSmooth, // 11, 0xB
+	UISideBarMode_DesignateCarveTrack, // 12, 0xC
+	UISideBarMode_DesignateEngrave, // 13, 0xD
+	UISideBarMode_DesignateCarveFortification, // 14, 0xE
+	UISideBarMode_Stockpiles, // 15, 0xF
+	UISideBarMode_Build, // 16, 0x10
+	UISideBarMode_QueryBuilding, // 17, 0x11
+	UISideBarMode_Orders, // 18, 0x12
+	UISideBarMode_OrdersForbid, // 19, 0x13
+	UISideBarMode_OrdersRefuse, // 20, 0x14
+	UISideBarMode_OrdersWorkshop, // 21, 0x15
+	UISideBarMode_OrdersZone, // 22, 0x16
+	UISideBarMode_BuildingItems, // 23, 0x17
+	UISideBarMode_ViewUnits, // 24, 0x18
+	UISideBarMode_LookAround, // 25, 0x19
+	UISideBarMode_DesignateItemsClaim, // 26, 0x1A
+	UISideBarMode_DesignateItemsForbid, // 27, 0x1B
+	UISideBarMode_DesignateItemsMelt, // 28, 0x1C
+	UISideBarMode_DesignateItemsUnmelt, // 29, 0x1D
+	UISideBarMode_DesignateItemsDump, // 30, 0x1E
+	UISideBarMode_DesignateItemsUndump, // 31, 0x1F
+	UISideBarMode_DesignateItemsHide, // 32, 0x20
+	UISideBarMode_DesignateItemsUnhide, // 33, 0x21
+	UISideBarMode_DesignateChopTrees, // 34, 0x22
+	UISideBarMode_DesignateToggleEngravings, // 35, 0x23
+	UISideBarMode_DesignateToggleMarker, // 36, 0x24
+	UISideBarMode_Hotkeys, // 37, 0x25
+	UISideBarMode_DesignateTrafficHigh, // 38, 0x26
+	UISideBarMode_DesignateTrafficNormal, // 39, 0x27
+	UISideBarMode_DesignateTrafficLow, // 40, 0x28
+	UISideBarMode_DesignateTrafficRestricted, // 41, 0x29
+	UISideBarMode_Zones, // 42, 0x2A
+	UISideBarMode_ZonesPenInfo, // 43, 0x2B
+	UISideBarMode_ZonesPitInfo, // 44, 0x2C
+	UISideBarMode_ZonesHospitalInfo, // 45, 0x2D
+	UISideBarMode_ZonesGatherInfo, // 46, 0x2E
+	UISideBarMode_DesignateRemoveConstruction, // 47, 0x2F
+	UISideBarMode_DepotAccess, // 48, 0x30
+	UISideBarMode_NotesPoints, // 49, 0x31
+	UISideBarMode_NotesRoutes, // 50, 0x32
+	UISideBarMode_Burrows, // 51, 0x33
+	UISideBarMode_Hauling, // 52, 0x34
+	UISideBarMode_ArenaWeather, // 53, 0x35
+	UISideBarMode_ArenaTrees, // 54, 0x36
+	UISideBarMode_BuildingLocationInfo, // 55, 0x37
+	UISideBarMode_ZonesLocationInfo, // 56, 0x38
+};
+]]
+
+-- nemesis_offload.h
+
+ffi.cdef[[
+typedef struct NemesisOffload {
+	vector_int32 nemesis_save_file_id;
+	vector_int16 nemesis_member_idx;
+	vector_Unit_ptr units;
+	UnitChunk * cur_unit_chunk;
+	int32_t cur_unit_chunk_num;
+	int32_t units_offloaded;
+} NemesisOffload;
+]]
+
+-- ui.h
+-- TODO is this ... on the UI thread?  because ... 
+
+ffi.cdef[[
+typedef int16_t UI_Nobles_BookkeeperSettings;
+enum {
+	UI_Nobles_BookkeeperSettings_nearest_10, // 0, 0x0
+	UI_Nobles_BookkeeperSettings_nearest_100, // 1, 0x1
+	UI_Nobles_BookkeeperSettings_nearest_1000, // 2, 0x2
+	UI_Nobles_BookkeeperSettings_nearest_10000, // 3, 0x3
+	UI_Nobles_BookkeeperSettings_all_accurate, // 4, 0x4
+};
+]]
+
+ffi.cdef[[
+typedef struct UI_Waypoints_Points {
+	int32_t id;
+	uint8_t tile;
+	int16_t fg_color;
+	int16_t bg_color;
+	std_string name;
+	std_string comment;
+	Coord pos;
+} UI_Waypoints_Points;
+]]
+makeStdVectorPtr'UI_Waypoints_Points'
+
+ffi.cdef[[
+typedef struct UI_Waypoints_Routes {
+	int32_t id;
+	std_string name;
+	vector_int32 points;
+} UI_Waypoints_Routes;
+]]
+makeStdVectorPtr'UI_Waypoints_Routes'
+
+ffi.cdef[[
+typedef struct UI_Alerts_List {
+	int32_t id;
+	std_string name;
+	vector_int32 burrows;
+} UI_Alerts_List;
+]]
+makeStdVectorPtr'UI_Alerts_List'
+
+ffi.cdef[[
+typedef struct UI_Unknown8 {
+	int32_t unk_1;
+	int32_t unk_2;
+	int32_t unk_3; /*!< refers to historical_figure_info::T_relationships::T_intrigues::T_plots::id */
+	int32_t unk_4;
+	int32_t unk_5;
+	int32_t unk_6;
+	int32_t unk_7;
+	int32_t unk_8;
+	int32_t unk_9;
+	Coord unk_10; /*!< guess; only x is initialized */
+	int32_t unk_11[16];
+	int32_t unk_12[16];
+	int32_t unk_13[16];
+	int32_t unk_14[16];
+	int32_t unk_15[16];
+	int32_t unk_16[16];
+	int32_t unk_17[16];
+	int32_t unk_18[16];
+	int32_t unk_19;
+	int32_t unk_20;
+	int32_t unk_21;
+	int32_t unk_22;
+	int32_t unk_23;
+} UI_Unknown8;
+]]
+makeStdVectorPtr'UI_Unknown8'
+
+ffi.cdef[[
+typedef struct UI_Main_DeadCitizens {
+	int32_t unit_id;
+	int32_t histfig_id;
+	int32_t death_year;
+	int32_t death_time;
+	int32_t timer; /*!< +1 per 10 */
+	GhostType ghost_type;
+} UI_Main_DeadCitizens;
+]]
+makeStdVectorPtr'UI_Main_DeadCitizens'
+
+ffi.cdef[[
+typedef struct UI {
+	int16_t game_state; /*!< 2 running, 1 lost to siege, 0 lost */
+	int32_t lost_to_siege_civ;
+	struct {
+		int16_t state;
+		int32_t check_timer;
+		vector_int32 rooms;
+		int32_t reach_room_timer;
+		int32_t tc_protect_timer;
+		int32_t guard1_reach_tc_timer;
+		int32_t guard2_reach_tc_timer;
+		int16_t collected;
+		int16_t quota;
+		Coord collector_pos;
+		int16_t guard_pos_x[2];
+		int16_t guard_pos_y[2];
+		int16_t guard_pos_z[2];
+		Unit* collector;
+		Unit* guard1;
+		Unit* guard2;
+		int8_t guard_lack_complained;
+	} tax_collection;
+	struct {
+		int32_t unk_1;
+		int32_t manager_cooldown; /*!< 0-1008 */
+		int32_t bookkeeper_cooldown; /*!< 0-1008 */
+		int32_t bookkeeper_precision;
+		UI_Nobles_BookkeeperSettings bookkeeper_settings;
+	} nobles;
+	vector_CaravanState_ptr caravans;
+	int8_t unk_2;
+	int16_t fortress_rank;
+	int16_t progress_population; /*!< ? */
+	int16_t progress_trade; /*!< ? */
+	int16_t progress_production; /*!< ? */
+	bool king_arrived;
+	bool king_hasty;
+	bool economy_active;
+	bool ignore_labor_shortage;
+	bool justice_active;
+	uint16_t unk_3;
+	uint16_t unk_4;
+	int16_t manager_timer;
+	struct {
+		int32_t desired_architecture;
+		int32_t desired_offerings;
+	} becoming_capital;
+	int16_t units_killed[152];
+	vector_int32 currency_value;
+	int32_t trees_removed;
+	int32_t unk_5;
+	int32_t fortress_age; /*!< ?; +1 per 10; used in first 2 migrant waves etc */
+	EntityActivityStatistics tasks;
+	vector_int32 meeting_requests; /*!< guild complaints and diplomats */
+	vector_ActivityInfo_ptr activities;
+	vector_MeetingDiplomatInfo_ptr dip_meeting_info;
+	vector_int32 aid_requesters;
+	bool gameOver;
+	struct {
+		vector_InvasionInfo_ptr list;
+		int32_t next_id;
+	} invasions;
+	vector_Punishment_ptr punishments;
+	vector_PartyInfo_ptr parties;
+	vector_RoomRentInfo_ptr room_rent;
+	vector_DipScriptInfo_ptr dipscripts;
+	vector_DipScriptPopup_ptr dipscript_popups; /*!< cause viewscreen_meetingst to pop up */
+	struct {
+		vector_ItemType item_types;
+		vector_int16 item_subtypes;
+		vector_int16 mat_types;
+		vector_int32 mat_indices;
+		vector_KitchenExcType exc_types;
+	} kitchen;
+	vector_char economic_stone;
+	union {
+		uint32_t flags;
+		struct {
+			uint32_t first_year : 1;
+			uint32_t recheck_aid_requests : 1;
+			uint32_t force_elections : 1;
+		};
+	} unk23c8_flags;
+	int16_t mood_cooldown;
+	int32_t civ_id;
+	int32_t site_id;
+	int32_t group_id; /*!< i.e. specifically the fortress dwarves */
+	int16_t race_id;
+	vector_int32 unk_races; /*!< since v0.42.01 */
+	vector_int16 farm_crops;
+	vector_Season farm_seasons;
+	struct {
+		struct {
+			vector_int32 general_items;
+			vector_int32 weapons;
+			vector_int32 armor;
+			vector_int32 handwear;
+			vector_int32 footwear;
+			vector_int32 headwear;
+			vector_int32 legwear;
+			vector_int32 prepared_food;
+			vector_int32 wood;
+			vector_int32 thread_cloth;
+			vector_int32 paper;
+			vector_int32 parchment;
+			vector_int32 bone;
+			vector_int32 tooth;
+			vector_int32 horn;
+			vector_int32 pearl;
+			vector_int32 shell;
+			vector_int32 leather;
+			vector_int32 silk;
+			vector_int32 yarn;
+			vector_int32 inorganic;
+			vector_int32 meat;
+			vector_int32 fish;
+			vector_int32 plants;
+			vector_int32 drinks;
+			vector_int32 extract_animal;
+			vector_int32 extract_plant;
+			vector_int32 mill_animal;
+			vector_int32 mill_plant;
+			vector_int32 cheese_animal;
+			vector_int32 cheese_plant;
+			vector_int32 pets;
+		} priceAdjustment;
+		struct {
+			vector_Unit_ptr general_items;
+			vector_Unit_ptr weapons;
+			vector_Unit_ptr armor;
+			vector_Unit_ptr handwear;
+			vector_Unit_ptr footwear;
+			vector_Unit_ptr headwear;
+			vector_Unit_ptr legwear;
+			vector_Unit_ptr prepared_food;
+			vector_Unit_ptr wood;
+			vector_Unit_ptr thread_cloth;
+			vector_Unit_ptr paper;
+			vector_Unit_ptr parchment;
+			vector_Unit_ptr bone;
+			vector_Unit_ptr tooth;
+			vector_Unit_ptr horn;
+			vector_Unit_ptr pearl;
+			vector_Unit_ptr shell;
+			vector_Unit_ptr leather;
+			vector_Unit_ptr silk;
+			vector_Unit_ptr yarn;
+			vector_Unit_ptr inorganic;
+			vector_Unit_ptr meat;
+			vector_Unit_ptr fish;
+			vector_Unit_ptr plants;
+			vector_Unit_ptr drinks;
+			vector_Unit_ptr extract_animal;
+			vector_Unit_ptr extract_plant;
+			vector_Unit_ptr mill_animal;
+			vector_Unit_ptr mill_plant;
+			vector_Unit_ptr cheese_animal;
+			vector_Unit_ptr cheese_plant;
+			vector_Unit_ptr pets;
+		} priceSetter;
+	} economyPrices;
+	struct {
+		int32_t reserved_bins;
+		int32_t reserved_barrels;
+		StockpileSettings custom_settings;
+	} stockpile;
+	struct {
+		int16_t unk1;
+		int16_t unk2;
+	} unk2a8c[4][768];
+	vector_int16 unk_mapedge_x;
+	vector_int16 unk_mapedge_y;
+	vector_int16 unk_mapedge_z;
+	struct {
+		vector_int16 layer_x[5];
+		vector_int16 surface_x;
+		vector_int16 layer_y[5];
+		vector_int16 surface_y;
+		vector_int16 layer_z[5];
+		vector_int16 surface_z;
+	} map_edge;
+	vector_int16 feature_x;
+	vector_int16 feature_y;
+	vector_int16 feature_id_local;
+	vector_int32 feature_id_global;
+	vector_int32 event_collections;
+	vector_int16 stone_mat_types;
+	vector_int16 stone_mat_indexes;
+	struct {
+		vector_UI_Waypoints_Points_ptr points;
+		vector_UI_Waypoints_Routes_ptr routes;
+		int16_t sym_selector;
+		int16_t unk_1;
+		int32_t cur_point_index;
+		bool in_edit_name_mode;
+		bool in_edit_text_mode;
+		uint8_t sym_tile;
+		int16_t sym_fg_color;
+		int16_t sym_bg_color;
+		vector_string_ptr unk5c04;
+		int32_t next_point_id;
+		int32_t next_route_id;
+		int32_t sel_route_idx;
+		int32_t sel_route_waypt_idx;
+		bool in_edit_waypts_mode;
+		vector_ptr unk_42_06; /*!< since v0.42.06 */
+	} waypoints;
+	struct {
+		vector_Burrow_ptr list;
+		int32_t next_id;
+		int32_t sel_index;
+		int32_t sel_id;
+		bool in_confirm_delete;
+		bool in_add_units_mode;
+		vector_Unit_ptr list_units;
+		vector_bool sel_units;
+		int32_t unit_cursor_pos;
+		bool in_define_mode;
+		bool brush_erasing;
+		Coord rect_start;
+		int16_t brush_mode;
+		bool in_edit_name_mode;
+		int16_t sym_selector;
+		int16_t sym_tile;
+		int16_t sym_fg_color;
+		int16_t sym_bg_color;
+	} burrows;
+	struct {
+		vector_UI_Alerts_List_ptr list;
+		int32_t next_id;
+		int32_t civ_alert_idx;
+	} alerts;
+	struct {
+		vector_Item_ptr items_unmanifested[112];
+		vector_Item_ptr items_unassigned[112];
+		vector_Item_ptr items_assigned[112];
+		union {
+			uint32_t flags;
+			struct {
+				uint32_t weapon : 1;
+				uint32_t armor : 1;
+				uint32_t shoes : 1;
+				uint32_t shield : 1;
+				uint32_t helm : 1;
+				uint32_t gloves : 1;
+				uint32_t ammo : 1;
+				uint32_t pants : 1;
+				uint32_t backpack : 1;
+				uint32_t quiver : 1;
+				uint32_t flask : 1;
+				uint32_t anon_1 : 1;
+				uint32_t buildings : 1;
+			};
+		} update;
+		vector_int32 work_weapons; /*!< i.e. woodcutter axes, and miner picks */
+		vector_int32 work_units;
+		vector_SquadAmmoSpec_ptr hunter_ammunition;
+		vector_int32 ammo_items;
+		vector_int32 ammo_units;
+		vector_TrainingAssignment_ptr training_assignments; /*!< since v0.34.06; sorted by animal_id */
+	} equipment;
+	/**
+	 * Since v0.34.08
+	 */
+	struct {
+		vector_HaulingRoute_ptr routes;
+		int32_t next_id;
+		vector_HaulingRoute_ptr view_routes;
+		vector_HaulingStop_ptr view_stops;
+		vector_int32 view_bad;
+		int32_t cursor_top;
+		bool in_stop;
+		int32_t cursor_stop;
+		vector_StopDepartCondition_ptr stop_conditions;
+		vector_RouteStockpileLink_ptr stop_links;
+		bool in_advanced_cond;
+		bool in_assign_vehicle;
+		int32_t cursor_vehicle;
+		vector_Vehicle_ptr vehicles;
+		bool in_name;
+		std_string old_name;
+	} hauling; /*!< since v0.34.08 */
+	vector_int32 petitions; /*!< related to agreements */
+	vector_int32 unk_6; /*!< since v0.47.01; observed allocating 4 bytes */
+	vector_ptr unk_7; /*!< since v0.44.01 */
+	vector_UI_Unknown8_ptr unk_8; /*!< since v0.47.01; related to (job_type)0xf1 */
+	vector_int32 infiltrator_histfigs; /*!< since v0.47.01 */
+	vector_int32 infiltrator_years; /*!< since v0.47.01 */
+	vector_int32 infiltrator_year_ticks; /*!< since v0.47.01 */
+	struct {
+		UIHotKey hotkeys[16];
+		int32_t traffic_cost_high;
+		int32_t traffic_cost_normal;
+		int32_t traffic_cost_low;
+		int32_t traffic_cost_restricted;
+		vector_UI_Main_DeadCitizens_ptr dead_citizens; /*!< ? */
+		HistoricalEntity* fortress_entity; /*!< entity pointed to by group_id */
+		WorldSite* fortress_site;
+		UISideBarMode mode;
+		int16_t unk1;
+		int16_t selected_traffic_cost; /*!< For changing the above costs. */
+		bool autosave_request;
+		bool autosave_unk; /*!< set to 0 when a_rq set to 1 */
+		int32_t unk6df4;
+		bool unk_44_12a;
+		char pad_1[3]; /*!< workaround for strange IDA 7.0 bug */
+		NemesisOffload unk_44_12b;
+		bool unk_44_12c; /*!< since v0.44.12 */
+		int32_t unk_44_12d; /*!< padding? */
+		int16_t selected_hotkey;
+		bool in_rename_hotkey;
+	} main;
+	struct {
+		vector_Squad_ptr list; /*!< valid only when ui is displayed */
+		vector_ptr unk6e08;
+		vector_bool sel_squads;
+		vector_int32 indiv_selected;
+		bool in_select_indiv;
+		int32_t sel_indiv_squad;
+		int32_t unk_70;
+		int32_t squad_list_scroll;
+		int32_t squad_list_first_id;
+		Squad* nearest_squad;
+		bool in_move_order;
+		int32_t point_list_scroll;
+		bool in_kill_order;
+		vector_Unit_ptr kill_rect_targets;
+		int32_t kill_rect_targets_scroll; /*!< also used for the list of targets at cursor */
+		bool in_kill_list;
+		vector_Unit_ptr kill_targets;
+		vector_bool sel_kill_targets;
+		int32_t kill_list_scroll;
+		bool in_kill_rect;
+		Coord rect_start;
+	} squads;
+	int32_t follow_unit;
+	int32_t follow_item;
+	vector_int16 selected_farm_crops; /*!< valid for the currently queried farm plot */
+	vector_bool available_seeds;
+} UI;
+]]
+asserteq(ffi.sizeof'UI', 35744)
+
+-- global_objects.h
 
 ffi.cdef[[
 typedef Rect3D SelectionRect;
