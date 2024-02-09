@@ -32,6 +32,9 @@ local function makeStdVector(T, name)
 				return self.finish - self.start
 			end
 
+			-- lua compat
+			mt.__len = mt.size
+
 			function mt:capacity()
 				return self.endOfStorage - self.start
 			end

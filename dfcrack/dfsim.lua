@@ -59,13 +59,17 @@ function dfsim.update()
 			for i,u in ipairs(df.world.units.active) do
 				-- can we guarantee that everything in .active is ... active?
 				assert(u ~= nil)
-				print('unit',
-					i,
-					u.name:translate(),
-					'isCitizen?', u:isCitizen(),
-					'isAlive?', u:isAlive()
-
-				)
+				if u.name.words[0] ~= -1 then
+					print('unit',
+						i,
+						'isCitizen?', u:isCitizen(),
+						'isAlive?', u:isAlive(),
+						u.name:translate(false, false),	-- dwarven
+						u.name:translate(true, false),	-- english
+						u.name:translate(false, true),	-- dwarven last
+						u.name:translate(true, true)	-- english last
+					)
+				end
 			end
 		end
 	else

@@ -10,20 +10,14 @@ local assertsizeof = require 'assertsizeof'
 -- https://stackoverflow.com/a/29401096/2714073
 -- whyyyyyy
 ffi.cdef[[
-typedef struct std_string_impl {
-	char * data;
-	size_t size; // this looks like it has a pointer in it ...
-	size_t cap;
-} std_string_impl;
-
 typedef union std_string {
 	// this is a char* pointer to the start of the string ...
 	char * s;
 	// this is for easy access of the members stored behind the start ...
-	// i[-1] == refcount
+	// i[-1] == refcount ... or somethign else?  i'm seeing some weird/bad values if it's refcounts ... more like pointers. ..
 	// i[-2] == capacity
 	// i[-3] == size
-	int * i;
+	ssize_t * i;
 } std_string;
 
 enum {

@@ -1,10 +1,12 @@
 --[[
 half hearted manually procured file of the globals.
-get rid of this in favor of generated dfcrack/df/*.lua
+get rid of this in favor of xml-generated dfcrack/df/*.lua
 
-TODO autogen a script for vanilla dfhack to write out all library/include/df/*.h struct sizeof()'s and offsetof()'s
-I think they have this accessible by script in the master branch
-or maybe autogen a gdb script to run on vanilla dfhack -g ?
+TODO autogen some C++ code for vanilla dfhack to write out all library/include/df/*.h struct sizeof()'s and offsetof()'s
+then insert it into somewhere like library/LuaApi.cpp,
+run it, get back the C++ offsets and sizeofs as Lua code
+insert it into dfcrack as an initializatin test
+you can even generate and store this per-version per-os
 --]]
 local ffi = require 'ffi'
 local template = require 'template'

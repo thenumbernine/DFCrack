@@ -4,7 +4,6 @@ TODO later I will split this up per-type and put them in dfcrack/byhand/mt/*
 and then once I convert dfcrack/byhand/types.lua to use struct(), then per-type I'll go looking for any override metatable functionality in this folder 
 --]]
 local ffi = require 'ffi'
-local asserteq = require 'asserteq'
 local table = require 'ext.table'
 local struct = require 'struct'
 
@@ -17,7 +16,7 @@ do
 	mt.__index = mt
 
 	function mt:translate(inEnglish, onlyLastPart)
-		local out = ''
+		local out = table()
 
 		local function addWordToOut(word)
 			if type(word) == 'cdata' then
@@ -25,17 +24,18 @@ do
 				if ffi.typeof(word) == ffi.typeof'std_string*' then
 					word = word[0]
 				else
-					asserteq(ffi.typeof(word), ffi.typeof'std_string')
+					assert(ffi.typeof(word) == ffi.typeof'std_string'
+						or ffi.typeof(word) == ffi.typeof'std_string&')
 				end
 				word = word:str()
 			end
 			if word == '' then return end
-			if #out > 0 then out = out .. ' ' end
-			out = out .. word
+			out:insert(word:sub(1,1):upper() .. word:sub(2))
 		end
 
 		-- concat lua str with std::string
 		-- testing for nils and std_string's 
+		-- do I need to test, or can I assert that the values will be valid?
 		local function concatStdStr(a,b)
 			assert(type(a) == 'string')
 			assert(type(b) == 'cdata')
@@ -43,7 +43,8 @@ do
 				assert(b ~= nil)
 				b = b[0]
 			else
-				asserteq(ffi.typeof(b), ffi.typeof'std_string')
+				assert(ffi.typeof(b) == ffi.typeof'std_string'
+					or ffi.typeof(b) == ffi.typeof'std_string&')
 			end
 			return a .. b:str()
 		end
@@ -62,15 +63,15 @@ do
 				if switch == DInitNickname_REPLACE_ALL then
 					return word
 				elseif switch == DInitNickname_REPLACE_FIRST then
-					out = ''
+					out = table()
 				elseif switch == DInitNickname_CENTRALIZE then
 				end
 				addWordToOut(word)
 			end
 		end
 
+		local lang = df.world.raws.language
 		if not inEnglish then
-			local lang = df.world.raws.language
 			local tltn = lang.translations:at(self.language)
 			if self.words[0] >= 0 
 			or self.words[1] >= 0
@@ -123,9 +124,9 @@ do
 			or self.words[5] >= 0
 			then
 				if #out > 0 then
-					out = out .. ' the'
+					out:insert'the'
 				else
-					out = out .. 'The'
+					out:insert'The'
 				end
 			end
 			for i=2,5 do
@@ -138,9 +139,9 @@ do
 			end
 			if self.words[6] >= 0 then
 				if #out > 0 then
-					out = out ..' of'
+					out:insert'of'
 				else
-					out = out .. 'Of'
+					out:insert'Of'
 				end
 				addWordToOut(
 					lang.words:at(self.words[6])
@@ -149,7 +150,7 @@ do
 			end
 		end
 
-		return out
+		return out:concat' '
 	end
 
 	df.LanguageName = ffi.metatype('LanguageName', mt)
