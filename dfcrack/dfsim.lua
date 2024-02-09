@@ -3,6 +3,9 @@ main entry point of the simulation thread
 called by the lua state that is run on the simulation thread (callback via SDL_NumJoysticks)
 --]]
 
+-- hack to run this standalone and test the xml-gen code
+local testXmlGen = ... == 'testxmlgen'
+
 --[[ debugging
 local ffi = require 'ffi'
 require 'ffi.req' 'c.pthread'
@@ -19,17 +22,18 @@ typedef struct df_flagarray {
 ]]
 --]]
 
--- [[ here's the by-hand port of the headers to luajit ...
-local df = require 'byhand.globals'
+local df
+if testXmlGen then
+	-- here's me working on the xml->luajit port
+	df = require 'df.globals'
+else
+	-- here's the by-hand port of the headers to luajit ...
+	df = require 'byhand.globals'
 
--- require this after doing the declarations in df
--- because it itself requires 'byhand.globals'
-require 'byhand.setup-mt-ffi'
-
---]]
---[[ here's me working on the xml->luajit port
-local df = require 'df.globals'
---]]
+	-- require this after doing the declarations in df
+	-- because it itself requires 'byhand.globals'
+	require 'byhand.setup-mt-ffi'
+end
 
 print('dfcrack df.version', df.version, df.version[0])
 

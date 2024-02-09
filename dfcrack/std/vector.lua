@@ -1,11 +1,11 @@
 local ffi = require 'ffi'
 local struct = require 'struct'
-local template = require 'template'
 
 -- TODO incorporate with ffi.cpp.vector?
 -- and maybe move that to its own lib, like std-ffi.vector ?
 
 local function makeStdVector(T, name)
+	-- TODO std_vector_*
 	name = name or 'vector_'..T:gsub('%*', '_ptr'):gsub('%s+', '')
 	local Tptr = T..' *'
 	-- stl vector in my gcc / linux / df is 24 bytes
