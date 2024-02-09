@@ -1,28 +1,13 @@
-#include "DFCrack/Main.h"
 #include "LuaCxx/State.h"
 #include "LuaCxx/Stack.h"
 #include "LuaCxx/Ref.h"
 
 #include <dlfcn.h>
-#include <iostream>
-#include <thread>	//debugging / checking thread of events vs updates vs init
+//#include <thread>	//debugging / checking thread of events vs updates vs init
 
-#if 0
-#define DEBUG_BEGIN(x, lua)\
-std::cout << #x " begin"\
-	<< " this_thread=" << std::this_thread::get_id() \
-	<< " top=" << lua.stack().top()\
-	<< std::endl;
+#define DFCRACK_CEXPORT extern "C" __attribute__ ((visibility("default")))
 
-#define DEBUG_END(x, lua)\
-std::cout << #x " end"\
-	<< " this_thread=" << std::this_thread::get_id() \
-	<< " top=" << lua.stack().top()\
-	<< std::endl;
-#else
-#define DEBUG_BEGIN(x, lua)
-#define DEBUG_END(x, lua)
-#endif
+struct SDL_Event;
 
 struct DFCrack {
 	/*
@@ -33,7 +18,7 @@ struct DFCrack {
 	but then how to manage that + the package.loaded + the directory structure of scripts?
 	for now i'll distinguish by naming one dfmain.lua / _G.dfmain and the other dfsim
 	each state will only have its respective table defined
-	
+
 	so...
 	dfcrack/dfmain.lua
 		.sdlInit()
@@ -44,48 +29,42 @@ struct DFCrack {
 	.. these have to be there.  the glue code doesn't test.
 	*/
 	LuaCxx::State luaMain;
-	
+
 	LuaCxx::State luaSim;
 	bool hasInitSim = {};
-	
+
 	DFCrack() {
-DEBUG_BEGIN(DFCrack::DFCrack, luaMain)
 		luaMain
 		.stack()
 		.getGlobal("require")
 		.push("dfmain")
 		.call(1, 1)
 		.setGlobal("dfmain");
-DEBUG_END(DFCrack::DFCrack, luaMain)
 	}
 	~DFCrack() {
-// trust in __gc methods to clean up?		
-DEBUG_BEGIN(DFCrack::~DFCrack, luaMain)
-DEBUG_END(DFCrack::~DFCrack, luaMain)
+// trust in __gc methods to clean up?
 	}
+
 	void sdlInit() {
-DEBUG_BEGIN(DFCrack::sdlInit, luaMain)
 		luaMain
 		.stack()
 		.getGlobal("dfmain")
 		.get("sdlInit")
 		.call(0, 0)
 		.pop();
-DEBUG_END(DFCrack::sdlInit, luaMain)
 	}
+
 	void sdlQuit() {
-DEBUG_BEGIN(DFCrack::sdlQuit, luaMain)
 		luaMain
 		.stack()
 		.getGlobal("dfmain")
 		.get("sdlQuit")
 		.call(0, 0)
 		.pop();
-DEBUG_END(DFCrack::sdlQuit, luaMain)
 		// TODO here or dtor run the dfsim.quit
 	}
+
 	bool sdlEvent(SDL_Event * ev) {
-DEBUG_BEGIN(DFCrack::sdlEvent, luaMain)
 		bool result = true;		// true default = df handles sdl events
 #if 0	//ugh segfault why
 		luaMain
@@ -99,13 +78,11 @@ DEBUG_BEGIN(DFCrack::sdlEvent, luaMain)
 		.pop(result)
 		.pop();
 #endif
-DEBUG_END(DFCrack::sdlEvent, luaMain)
 		return result;
 	}
-	
+
 	// run on a separate thread
 	void update() {
-DEBUG_BEGIN(DFCrack::update, luaSim)
 		if (!hasInitSim) {
 			hasInitSim = true;
 			luaSim
@@ -121,7 +98,6 @@ DEBUG_BEGIN(DFCrack::update, luaSim)
 		.get("update")
 		.call(0, 0)
 		.pop();
-DEBUG_BEGIN(DFCrack::update, luaSim)
 	}
 
 };
@@ -137,7 +113,7 @@ DFCRACK_CEXPORT int SDL_Init(uint32_t flags) {
 #define OVERRIDE(x)\
 	_##x = (decltype(_##x)) dlsym(RTLD_NEXT, #x);\
 	if (!_##x) throw std::runtime_error("dlsym " #x " failed");
-	
+
 	OVERRIDE(SDL_Init)
 	OVERRIDE(SDL_Quit)
 	OVERRIDE(SDL_PollEvent)
@@ -169,7 +145,7 @@ DFCRACK_CEXPORT int SDL_NumJoysticks() {
 }
 
 DFCRACK_CEXPORT int SDL_PollEvent(SDL_Event * const event) {
-//std::cout << "SDL_PollEvent" << std::endl;	
+//std::cout << "SDL_PollEvent" << std::endl;
 	if (!event) return 0;
 	int result;
 	while ((result = _SDL_PollEvent(event))) {
