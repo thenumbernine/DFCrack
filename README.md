@@ -1,4 +1,7 @@
-# DFCrack #
+# DFCrack
+
+[![Donate via Stripe](https://img.shields.io/badge/Donate-Stripe-green.svg)](https://buy.stripe.com/00gbJZ0OdcNs9zi288)<br>
+[![Donate via Bitcoin](https://img.shields.io/badge/Donate-Bitcoin-green.svg)](bitcoin:37fsp7qQKU8XoHZGRQvVzQVP8FrEJ73cSJ)<br>
 
 This is a recreation of [DFHack](https://github.com/DFHack/dfhack) in pure LuaJIT.
 
@@ -6,7 +9,7 @@ DFHack is great for its its C++ API, its extensibility, thread safety, and its m
 However somewhere in the middle of using it I started thinking to myself, "This could be written in pure LuaJIT".
 And so now we have this.
 
-# The C++ Code #
+# The C++ Code
 
 Right now the project-specific C++ is as minimal as possible.
 
@@ -20,13 +23,13 @@ The other state loads the file `dfcrack/dfsim.lua`, which goes on to handle the 
 
 The release build of the result weighs in at a whopping 17kb on my machine.
 
-# C++ External Dependencies #
+# C++ External Dependencies
 
 I'm using my dated [LuaCxx](https://github.com/thenumbernine/LuaCxx) library for lazy C++ invocation of the Lua API.  I'm sure there's better ones out there.  Meh.  Release is only 66kb on my machine.
 
 With that comes dependency on my [Common]( https://github.com/thenumbernine/Common) library for dated C++ features that hadn't been made standard when I started writing it 10+ years ago.  Meh. Release is only 34kb on my machine.
 
-# The LuaJIT Code #
+# The LuaJIT Code
 
 Fair warning, this code contains as little safety mechanisms as possible, versus DFHack whose API is fairly well-guarded from things like null pointers.  The goal of this is to run fast, so I'm trying to pull out a decent number of stops, at my discretion.
 
@@ -39,7 +42,7 @@ This is functioning but for some simple features, like enumerating units, printi
 The second version is auto-generated from the XML files of DFHack.
 Right now it auto-generates LuaJIT FFI code, 
 
-# Lua External Dependencies #
+# Lua External Dependencies
 
 - [lua-ext](https://github.com/thenumbernine/lua-ext)
 - [lua-template](https://github.com/thenumbernine/lua-template)
@@ -48,14 +51,14 @@ Right now it auto-generates LuaJIT FFI code,
 - [lua-ffi-bindings](https://github.com/thenumbernine/lua-ffi-bindings) maybe if I want to make any libc calls.
 - ...and probably more.  You can find the ones I forgot in my github repo.
 
-# Building #
+# Building
 
 Building the C++ code uses my proprietery [lua-make](https://github.com/thenumbernine/lua-make) system.
 But this is just a thin wrapper for command-line invocations with timestamp testing.
 Maybe I'll get GNU Makefile working.
 No way I'm touching CMake.
 
-# TODO #
+# TODO
 
 - Finish the XML-generation, and switch my current testing over from the hand-crafted code to the XML-generated code.
 - Have the XML-generated code make use of [struct-lua](https://github.com/thenumbernine/struct-lua) for runtime generation and filtering of C struct fields based on DF version, for implicit `__tostring` functionality, etc.
