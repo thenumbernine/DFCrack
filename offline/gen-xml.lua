@@ -706,6 +706,7 @@ function Emitter:buildStructType(
 								-- but don't add it if it's a locally defined struct
 								fieldType:addTypesUsed(self.typesUsed)
 								-- remove locally defined structs from the require() fields
+								-- TODO also in GlobalEmitter:process
 								for _,s in ipairs(self.locallyDefinedStructs) do
 									self.typesUsed[s.reqStmt] = nil
 								end
@@ -909,6 +910,12 @@ function GlobalEmitter:process(node)
 			globalType:addTypesUsed(self.typesUsed)
 			if code and string.trim(code) ~= '' then
 				globalStructDefs:insert(code)
+			else
+				-- remove locally defined structs from the require() fields
+				-- TODO also in Emitter:buildStructType
+				for _,s in ipairs(self.locallyDefinedStructs) do
+					self.typesUsed[s.reqStmt] = nil
+				end
 			end
 			for _,code in ipairs(globalStructDefs) do
 				self.structCode:insert(code)
