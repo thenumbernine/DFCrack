@@ -1,12 +1,19 @@
 local ffi = require 'ffi'
 local struct = require 'struct'
 
+local defined = {}
+
 -- TODO incorporate with ffi.cpp.vector?
 -- and maybe move that to its own lib, like std-ffi.vector ?
 
 local function makeStdVector(T, name)
 	-- TODO std_vector_*
 	name = name or 'vector_'..T:gsub('%*', '_ptr'):gsub('%s+', '')
+	
+	-- cache types so I don't declare one twice (and error luajit)
+	local ctype = defined[name] 
+	if ctype then return ctype end
+
 	local Tptr = T..' *'
 	-- stl vector in my gcc / linux / df is 24 bytes
 	-- template type of our vector ... 8 bytes mind you
@@ -75,6 +82,10 @@ local function makeStdVector(T, name)
 
 	assert(ffi.sizeof(name) == 24)
 	assert(ffi.sizeof(T..'*') == 8)
+
+	ctype = ffi.typeof(name)
+	defined[name] = ctype
+	return ctype
 end
 
 return makeStdVector

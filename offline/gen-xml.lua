@@ -358,8 +358,6 @@ function Emitter:write()
 end
 
 
-local baseFieldName
-
 --[[
 I think the intended interpretation is, for a particular global-type/field-type/templated-type is ...
 1) look at attr type-name
@@ -401,7 +399,13 @@ function Emitter:getTypeFromAttrOrChildren(
 		end
 
 		local structType = self:makeStructType(
-			namespace:concat'_'..'_'..makeTypeName(baseFieldName or '')	-- struct name
+			table(namespace)
+			:append{
+				self.baseFieldName
+				and self.baseFieldName ~= ''
+				and makeTypeName(self.baseFieldName)
+				or nil
+			}:concat'_'
 		)
 
 		-- implicit inline struct
@@ -574,7 +578,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			assert(fieldTypeStr)
 
 			if fieldnode.child then
-				out:insert('// TODO need to insert an enum here for field '..baseFieldName)
+				out:insert('// TODO need to insert an enum here for field '..self.baseFieldName)
 			end
 
 			return Type(fieldTypeStr)
@@ -584,7 +588,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			return Type(fieldtag)	-- prim
 		end
 	end, function(err)
-		return 'for base name '..tostring(baseFieldName)..'\n'
+		return 'for base name '..tostring(self.baseFieldName)..'\n'
 			..'and current tag '..tostring(fieldnode.tag)..'\n'
 			..err..'\n'
 			..debug.traceback()
@@ -664,7 +668,7 @@ function Emitter:buildStructType(
 							-- capture the first name.
 							-- what to do if it's nil?
 							-- it is nil for anonymous nested structs ...
-							baseFieldName = fieldName or baseFieldName
+							self.baseFieldName = fieldName or self.baseFieldName
 
 							-- since most inline structs are named by their fields ...
 							local fieldNamespace = table(namespace) --:append{fieldName and makeTypeName(fieldName)}
@@ -867,6 +871,11 @@ end
 function GlobalEmitter:process(node)
 	-- accumulate these
 
+	-- clear the last base field name
+	-- this is a mess
+	-- struct-type's aren't nested are they?  just compound is used for nested struct defs right?
+	self.baseFieldName = nil
+
 	-- TODO duplicate for struct and class below?
 	local name = htmlcommon.findattr(node, 'name')
 	local since = htmlcommon.findattr(node, 'since')
@@ -891,7 +900,7 @@ function GlobalEmitter:process(node)
 			local globalStructDefs = table()
 			local globalType, code = self:getTypeFromAttrOrChildren(
 				node,
-				table{'Global'},
+				table{'Global', makeTypeName(name)},
 				globalTypesUsed,
 				globalStructDefs
 			)
