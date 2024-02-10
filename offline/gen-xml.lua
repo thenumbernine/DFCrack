@@ -349,6 +349,18 @@ local function buildRequireStmts(reqStmts)
 	return table.keys(reqStmts):sort():concat'\n'
 end
 
+
+--[[
+TODO
+ok i gotta lookup info in one type to make another type
+that means now i have to keep track of types ...
+looks like for the sake of enums i have to track them per-xml but across multiple emitted structs
+... should I just track allll of the created ones?
+maybe I can use that for better sorting out of require() order later ... to put the output into one giant file ...
+--]]
+local createdTypes = table()
+
+
 -- class that spits out a file of a certain type
 local Emitter = class()
 
@@ -439,7 +451,7 @@ function Emitter:getTypeFromAttrOrChildren(
 			}:concat'_'
 		)
 
-		-- implicit inline struct
+		-- implicit inline anonymous struct
 		local code = self:buildStructType(
 			node,
 			structType,
@@ -679,7 +691,11 @@ structNode = element in xml dom
 structName = passed into this function, since it may or may not exist
 	but it is usually (always?) defined by structNode's 'name' attr
 namespace = namespace
-reqStmts = used for recording require()'s
+
+called by
+- StructEmitter:process - called once per struct-type in a xml file, which are specified at file scope i think
+- Emitter:getTypeFromAttrOrChildren - when a field has multiple children of fields, then it's a nested anonymous struct
+- Emitter:makeTypeNode for the node being 'compound' (what's the dif between <compound> an just implicit anonymous? and struct-type ?)
 --]]
 function Emitter:buildStructType(
 	structNode,
