@@ -1,14 +1,12 @@
 #!/usr/bin/env luajit
 --[[
 quick port of dfhack's codegen.out.xml into a lua file (so i don't have to parse the xml at runtime)
-run this from the root dir, so everything is offline/
+run this from the project root dir, so everything is offline/ or dfcrack/
 turns out xml2lua doesn't preserve node order so I'll use my htmlparser which does
-hmm too many edge cases
-maybe I'll just write a filter for the already-generated headers themselves...
-... nah, I think it's easier to just parse the xml, even tho there are a ton of edge cases for something as simple as just determining the type of a field ...
 
 TODO
 - output lua code using my struct-lua, and filter fields based on version at runtime based on the inferred DF version
+- vtables
 --]]
 
 local path = require 'ext.path'
@@ -228,9 +226,9 @@ function Type:declare(var)
 	end
 	return self.destName..' '..(var or '')
 end
-function Type:addTypesUsed(typesUsed)
+function Type:addRequires(reqStmts)
 	if not reservedTypeNames[self.name] then
-		typesUsed[self.reqStmt] = true
+		reqStmts[self.reqStmt] = true
 	end
 end
 
@@ -242,8 +240,8 @@ function ArrayType:init(base, count)
 
 	self.destName = self.base.destName..'['..self.count..']'
 end
-function ArrayType:addTypesUsed(...)
-	return self.base:addTypesUsed(...)
+function ArrayType:addRequires(...)
+	return self.base:addRequires(...)
 end
 function ArrayType:declare(var)
 	if var then
@@ -268,8 +266,8 @@ function PtrType:init(base)
 	self.destName = self.base.destName..' *'
 	self.reqStmt = self.base.reqStmt
 end
-function PtrType:addTypesUsed(...)
-	return self.base:addTypesUsed(...)
+function PtrType:addRequires(...)
+	return self.base:addRequires(...)
 end
 -- [[
 function PtrType:declare(var)
@@ -293,8 +291,8 @@ function STLVectorType:init(T)
 	-- TODO this only works if .T is not a STL class itself...
 	self.reqStmt = "require 'std.vector' '"..self.T.destName.."'"
 end
-function STLVectorType:addTypesUsed(...)
-	return self.T:addTypesUsed(...)
+function STLVectorType:addRequires(...)
+	return self.T:addRequires(...)
 end
 
 local STLDequeType = Type:subclass()
@@ -305,8 +303,8 @@ function STLDequeType:init(T)
 	-- TODO this only works if .T is not a STL class itself...
 	self.reqStmt = "require 'std.deque' '"..self.T.destName.."'"
 end
-function STLDequeType:addTypesUsed(...)
-	return self.T:addTypesUsed(...)
+function STLDequeType:addRequires(...)
+	return self.T:addRequires(...)
 end
 
 local AnonStructType = Type:subclass()
@@ -315,10 +313,10 @@ function AnonStructType:init()
 	self.destName = ''
 	self.reqStmt = ''
 end
-function AnonStructType:addTypesUsed(typesUsed) end
+function AnonStructType:addRequires(reqStmts) end
 
-local function buildTypesUsed(typesUsed)
-	return table.keys(typesUsed):sort():concat'\n'
+local function buildRequireStmts(reqStmts)
+	return table.keys(reqStmts):sort():concat'\n'
 end
 
 -- class that spits out a file of a certain type
@@ -336,12 +334,12 @@ function Emitter:init(args)
 	self.out = table()
 
 	-- collection of xml->lua types in other files that will need to be required
-	self.typesUsed = {}
+	self.reqStmts = {}
 
 	-- collection of lua declarations. for inline structs and their templated-vector-generations to be inserted into
 	-- collections of strings to be turned into ffi.cdef's
 	-- used by StructEmitter and global Emitter
-	-- if a struct goes here then it shouldn't go in the typesUsed
+	-- if a struct goes here then it shouldn't go in the reqStmts
 	-- TODO ... really is this just the same as .out?
 	self.outStmts = table()
 
@@ -514,10 +512,10 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			end
 			local resultType = STLDequeType(templateType)
 			-- hmmmm not working
-			--resultType:addTypesUsed(self.typesUsed) 
+			--resultType:addRequires(self.reqStmts) 
 			-- instead
 			self.outStmts:insert(resultType.reqStmt)
-			-- TODO move these reqStmts to the top of the file & remove duplicates .. use .typesUsed?
+			-- TODO move these reqStmts to the top of the file & remove duplicates .. use .reqStmts?
 			return resultType
 		elseif fieldtag == 'stl-vector' then
 			local templateType, code = self:getTypeFromAttrOrChildren(
@@ -535,10 +533,10 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			end
 			local resultType = STLVectorType(templateType)
 			-- hmmmm not working
-			--resultType:addTypesUsed(self.typesUsed)
+			--resultType:addRequires(self.reqStmts)
 			-- instead
 			self.outStmts:insert(resultType.reqStmt)
-			-- TODO move these reqStmts to the top of the file & remove duplicates .. use .typesUsed?
+			-- TODO move these reqStmts to the top of the file & remove duplicates .. use .reqStmts?
 			return resultType
 		elseif fieldtag == 'df-flagarray' then
 			local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
@@ -621,7 +619,7 @@ structNode = element in xml dom
 structName = passed into this function, since it may or may not exist
 	but it is usually (always?) defined by structNode's 'name' attr
 namespace = namespace
-typesUsed = used for recording require()'s
+reqStmts = used for recording require()'s
 --]]
 function Emitter:buildStructType(
 	structNode,
@@ -640,14 +638,23 @@ function Emitter:buildStructType(
 			assert(parentType)
 			assert(structName)
 			parentType = makeTypeName(parentType)
+			-- TODO copy fields so that we have a new ctype / metatype
 			out:insert('typedef '..parentType..' '..structName..';')
 		else
 			local structVsUnion = htmlcommon.findattr(structNode, 'is-union') and 'union' or 'struct'
 			if structName then
-				out:insert('typedef '..structVsUnion..' '..structName..' {')
+				out:insert('typedef '..structVsUnion..' '..structName..' '..structName..';')
+				out:insert(structVsUnion..' '..structName..' {')
 			else
+				-- anonymous struct/union, used for inline
 				out:insert(structVsUnion..' {')
 			end
+			
+			if parentType then
+				-- TODO copy fields so that we have a new ctype / metatype
+				out:insert('\t'..makeTypeName(parentType)..' super;')
+			end
+
 			for _,fieldnode in ipairs(structNode.child) do
 				-- tag name is the c-type, name is the field name
 				if type(fieldnode) == 'table'
@@ -695,9 +702,9 @@ function Emitter:buildStructType(
 								-- how about collecting them in another location?
 								if AnonStructType:isa(fieldType) then
 									out:insert(code)
-									-- if this is an anon struct then it shouldn't have any types, right? so no .typesUsed
+									-- if this is an anon struct then it shouldn't have any types, right? so no .reqStmts
 								else
-									-- if this is inserted prior then we don't want to require its name, so no .typesUsed
+									-- if this is inserted prior then we don't want to require its name, so no .reqStmts
 									self.outStmts:insert'ffi.cdef[['
 									self.outStmts:insert(code)
 									self.outStmts:insert']]'
@@ -706,11 +713,11 @@ function Emitter:buildStructType(
 							else
 								-- no struct def -- add type
 								-- but don't add it if it's a locally defined struct
-								fieldType:addTypesUsed(self.typesUsed)
+								fieldType:addRequires(self.reqStmts)
 								-- remove locally defined structs from the require() fields
 								-- TODO also in GlobalEmitter:process
 								for _,s in ipairs(self.locallyDefinedStructs) do
-									self.typesUsed[s.reqStmt] = nil
+									self.reqStmts[s.reqStmt] = nil
 								end
 							end
 							out:insert('\t'..fieldType:declare(fieldName or '')..';')
@@ -722,7 +729,7 @@ function Emitter:buildStructType(
 			-- TODO if no struct name then we want the caller to insert this struct at the top of the file - no inline structs in luajit ... ? i think?
 			-- more specifically, no vectors-of-anon-structs, nor are there in the generated c++ headers
 			-- but we do want nameless inline structs because that is used for struct/union memory alignment more than anything
-			out:insert('} '..(structName and structName..';' or ''))
+			out:insert('} '..(structName and ';' or ''))
 		end
 
 		return out:concat'\n'
@@ -811,8 +818,13 @@ function StructEmitter:process(node)
 		out:insert(code)
 	end
 
+	-- no require loops
+	self.reqStmts[self.structType.reqStmt] = nil
 	-- insert require() stmts
-	out:insert(1, buildTypesUsed(self.typesUsed))
+	local s = buildRequireStmts(self.reqStmts)
+	if s ~= '' then
+		out:insert(1, s)
+	end
 end
 
 
@@ -909,14 +921,14 @@ function GlobalEmitter:process(node)
 			)
 			assert(globalType)
 			assert(Type:isa(globalType))
-			globalType:addTypesUsed(self.typesUsed)
+			globalType:addRequires(self.reqStmts)
 			if code and string.trim(code) ~= '' then
 				globalStructDefs:insert(code)
 			else
 				-- remove locally defined structs from the require() fields
 				-- TODO also in Emitter:buildStructType
 				for _,s in ipairs(self.locallyDefinedStructs) do
-					self.typesUsed[s.reqStmt] = nil
+					self.reqStmts[s.reqStmt] = nil
 				end
 			end
 			for _,code in ipairs(globalStructDefs) do
@@ -932,12 +944,11 @@ function GlobalEmitter:process(node)
 end
 
 function GlobalEmitter:write()
-
 	-- construct .out from .structCode and .objDefs
 	-- maybe every emitter doesn't need .out?
 	self.out = table()
 	:append{ (function()
-		local s = string.trim(buildTypesUsed(self.typesUsed))
+		local s = string.trim(buildRequireStmts(self.reqStmts))
 		return s ~= '' and s or nil
 	end)() }
 	:append( (function()
