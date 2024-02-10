@@ -122,6 +122,9 @@ local primitiveTypeNames = {
 	['s-float'] = 'float',	-- not sure where I should be doing this translation.  the lhs is an xml tag, the rhs is the C type.
 	['df-flagarray'] = 'df_flagarray',
 }
+
+-- TODO time to make a global type registry ...
+
 -- reserved = do require, don't transform
 local reservedTypeNames = table(primitiveTypeNames, {
 	'vector_bool',
@@ -253,8 +256,8 @@ function ArrayType:init(base, count)
 
 	self.destName = self.base.destName..'['..self.count..']'
 end
-function ArrayType:addRequires(...)
-	return self.base:addRequires(...)
+function ArrayType:addRequires(reqStmts)
+	return self.base:addRequires(reqStmts)
 end
 function ArrayType:declare(var)
 	if var then
@@ -295,7 +298,6 @@ function PtrType:addRequires(reqStmts)
 		local reqStmt ="require 'ffi'.cdef'typedef struct "..decay.destName.." "..decay.destName..";'"
 		reqStmts[reqStmt] = true
 	end
-	-- else do the base:addRequire ?
 	--]]
 end
 -- [[
@@ -323,6 +325,10 @@ function STLVectorType:init(T)
 end
 -- ok this is not decay
 function STLVectorType:decay() return self.T end
+function STLVectorType:addRequires(reqStmts)
+	self.T:addRequires(reqStmts)
+	STLVectorType.super.addRequires(self, reqStmts)
+end
 
 
 local STLDequeType = Type:subclass()
@@ -335,7 +341,10 @@ function STLDequeType:init(T)
 end
 -- ok this is not decay
 function STLDequeType:decay() return self.T end
-
+function STLDequeType:addRequires(reqStmts)
+	self.T:addRequires(reqStmts)
+	STLDequeType.super.addRequires(self, reqStmts)
+end
 
 local AnonStructType = Type:subclass()
 function AnonStructType:init()
@@ -430,7 +439,7 @@ function Emitter:getTypeFromAttrOrChildren(
 			)
 		end
 
-		local structType = self:makeStructType(
+		local structType = self:getStructTypeWithUniqueName(
 			table(namespace)
 			:append{
 				self.baseFieldName
@@ -551,9 +560,9 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			end
 			local resultType = STLDequeType(templateType)
 			-- hmmmm reqStmts sorts and inserts at the top, but some of these need to go after their locally-defined structs ... 
-			--resultType:addRequires(self.reqStmts) 
+			resultType:addRequires(self.reqStmts) 
 			-- instead ... makes duplicates
-			self.outStmts:insert(resultType.reqStmt)
+			--self.outStmts:insert(resultType.reqStmt)
 			-- TODO move these reqStmts to the top of the file & remove duplicates ...
 			return resultType
 		elseif fieldtag == 'stl-vector' then
@@ -572,17 +581,18 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			end
 			local resultType = STLVectorType(templateType)
 			-- hmmmm reqStmts sorts and inserts at the top, but some of these need to go after their locally-defined structs ... 
-			--resultType:addRequires(self.reqStmts)
+			resultType:addRequires(self.reqStmts)
 			-- instead ... makes duplicates
-			self.outStmts:insert(resultType.reqStmt)
+			--self.outStmts:insert(resultType.reqStmt)
 			-- TODO move these reqStmts to the top of the file & remove duplicates ...
 			return resultType
 		elseif fieldtag == 'stl-bit-vector' then
 			local resultType = STLVectorType(Type'bool')
 			-- hmmmm reqStmts sorts and inserts at the top, but some of these need to go after their locally-defined structs ... 
-			--resultType:addRequires(self.reqStmts)
+			resultType:addRequires(self.reqStmts)
 			-- instead ... makes duplicates
-			self.outStmts:insert(resultType.reqStmt)
+			-- or TODO also keep track of these in ANOTHER table, and dont add them if theyre already added ....
+			--self.outStmts:insert(resultType.reqStmt)
 			-- TODO move these reqStmts to the top of the file & remove duplicates ...
 			return resultType		
 		elseif fieldtag == 'df-flagarray' then
@@ -662,8 +672,7 @@ end
 --[[
 call this to make a struct Type before passing it on to the buildStructType
 --]]
-function Emitter:makeStructType(structDestName)
-io.stderr:write('makeStructType ', structDestName, '\n')
+function Emitter:getStructTypeWithUniqueName(structDestName)
 	for suffix=1,math.huge do
 		-- keep building structTypes until we find one that's not used
 		-- this should  be fine so long as the Type ctor doesn't write to any external places
@@ -691,8 +700,16 @@ function Emitter:buildStructType(
 	if structName == '' then structName = nil end
 
 	return select(2, assert(xpcall(function()
-
 		local out = table()
+
+		-- if we're building a named strut , which will be popped out at global scope,
+		-- then make a new grouping of require() stmts
+		-- don't just push all requre()'s to the top beause sometimes we need to build deques vectors etc based on previusly locally defined structs
+		local pushReqStmts 
+		if not AnonStructType:isa(structType) then
+			pushReqStmts = self.reqStmts
+			self.reqStmts = {}
+		end
 
 		local parentType = htmlcommon.findattr(structNode, 'inherits-from')
 		if not structNode.child then
@@ -791,6 +808,18 @@ function Emitter:buildStructType(
 			-- more specifically, no vectors-of-anon-structs, nor are there in the generated c++ headers
 			-- but we do want nameless inline structs because that is used for struct/union memory alignment more than anything
 			out:insert('} '..(structName and ';' or ''))
+		end
+
+		if pushReqStmts then
+			
+			local s = buildRequireStmts(self.reqStmts)
+			if s ~= '' then
+				out:insert(1, ']]\n'
+					..s..'\n'
+					..'ffi.cdef[[')
+			end
+
+			self.reqStmts = pushReqStmts
 		end
 
 		return out:concat'\n'
