@@ -127,9 +127,9 @@ local primitiveTypeNames = {
 
 -- reserved = do require, don't transform
 local reservedTypeNames = table(primitiveTypeNames, {
-	'vector_bool',
-	'vector_string',
-	'vector_int',
+	'std_vector_bool',
+	'std_vector_string',
+	'std_vector_int',
 }):setmetatable(nil)
 
 -- not reserved, so still need to require, but is remapped
@@ -314,37 +314,26 @@ end
 --]]
 function PtrType:decay() return self.base end
 
-local STLVectorType = Type:subclass()
-function STLVectorType:init(T)
+local STLType = Type:subclass()
+STLType.localScopeName = 'vector'
+function STLType:init(T)
 	assert(Type:isa(T))
 	self.T = T
 	-- TODO the suffix substitution will screw up for vector-of-pointers-to-fixed-size-arrays
-	self.destName = 'vector_'..self.T.destName:gsub(' %*', '_ptr')
+	self.destName = 'std_'..self.localScopeName..'_'..self.T.destName:gsub(' %*', '_ptr')
 	-- TODO this only works if .T is not a STL class itself...
-	self.reqStmt = "require 'std.vector' '"..self.T.destName.."'"
+	self.reqStmt = "require 'std."..self.localScopeName.."' '"..self.T.destName.."'"
 end
 -- ok this is not decay
-function STLVectorType:decay() return self.T end
-function STLVectorType:addRequires(reqStmts)
+function STLType:decay() return self.T end
+function STLType:addRequires(reqStmts)
 	self.T:addRequires(reqStmts)
-	STLVectorType.super.addRequires(self, reqStmts)
+	STLType.super.addRequires(self, reqStmts)
 end
 
+local STLVectorType = STLType:subclass()
+local STLDequeType = STLType:subclass()
 
-local STLDequeType = Type:subclass()
-function STLDequeType:init(T)
-	assert(Type:isa(T))
-	self.T = T
-	self.destName = 'std_deque_'..self.T.destName:gsub(' %*', '_ptr')
-	-- TODO this only works if .T is not a STL class itself...
-	self.reqStmt = "require 'std.deque' '"..self.T.destName.."'"
-end
--- ok this is not decay
-function STLDequeType:decay() return self.T end
-function STLDequeType:addRequires(reqStmts)
-	self.T:addRequires(reqStmts)
-	STLDequeType.super.addRequires(self, reqStmts)
-end
 
 local AnonStructType = Type:subclass()
 function AnonStructType:init()
@@ -395,6 +384,7 @@ function Emitter:write()
 		-- fix the spacing with inline structs
 		:gsub('}%s+;', '};')
 		:gsub(' +\n\t+ ', ' ')
+		:gsub('ffi.cdef%[%[\n%]%]', '')	-- another thing to fix ...
 	))
 end
 
