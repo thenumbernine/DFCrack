@@ -217,7 +217,16 @@ function Type:init(name, destName)
 
 	-- .destName is the lua filename / struct-name
 	-- .reqStmt is the require-stmt
-	self.reqStmt = self.reqStmt or "require 'df."..self.destName.."'"
+	if not self.reqStmt then
+		-- TODO time to analyze the require graph as a whole and see where the loops are ...
+		-- attempt at a lazy fix ...
+		--if self:declare():find'%*' then
+		--	self.reqStmt = "require 'ffi'.cdef'typedef struct "..self.destName.." "..self.destName..";'"
+		--else
+		-- but I don't care here, I need to know in the fields later that use this type in PtrType's
+		self.reqStmt = "require 'df."..self.destName.."'"
+		--end
+	end
 end
 
 function Type:declare(var)
@@ -226,11 +235,15 @@ function Type:declare(var)
 	end
 	return self.destName..' '..(var or '')
 end
+
 function Type:addRequires(reqStmts)
 	if not reservedTypeNames[self.name] then
 		reqStmts[self.reqStmt] = true
 	end
 end
+
+function Type:decay() return self end
+
 
 local ArrayType = Type:subclass()
 function ArrayType:init(base, count)
@@ -249,6 +262,9 @@ function ArrayType:declare(var)
 	end
 	return self.base:declare(var)..'['..self.count..']'
 end
+-- is this technically decay?
+function ArrayType:decay() return self.base end
+
 
 local PtrType = Type:subclass()
 function PtrType:init(base)
@@ -266,8 +282,21 @@ function PtrType:init(base)
 	self.destName = self.base.destName..' *'
 	self.reqStmt = self.base.reqStmt
 end
-function PtrType:addRequires(...)
+function PtrType:addRequires(reqStmts)
+	--[[ add ptrs as is
 	return self.base:addRequires(...)
+	--]]
+	-- [[ versus fwd-declare them
+	local decay = self:decay()
+	if not reservedTypeNames[decay.name] 
+	--and not remappedTypeNames[decay.name] but lookup the destName then
+	and decay.name ~= 'stl-string'
+	then
+		local reqStmt ="require 'ffi'.cdef'typedef struct "..decay.destName.." "..decay.destName..";'"
+		reqStmts[reqStmt] = true
+	end
+	-- else do the base:addRequire ?
+	--]]
 end
 -- [[
 function PtrType:declare(var)
@@ -281,6 +310,7 @@ function PtrType:declare(var)
 	return PtrType.super.declare(self, var)
 end
 --]]
+function PtrType:decay() return self.base end
 
 local STLVectorType = Type:subclass()
 function STLVectorType:init(T)
@@ -294,6 +324,9 @@ end
 function STLVectorType:addRequires(...)
 	return self.T:addRequires(...)
 end
+-- ok this is not decay
+function STLVectorType:decay() return self.T end
+
 
 local STLDequeType = Type:subclass()
 function STLDequeType:init(T)
@@ -306,6 +339,9 @@ end
 function STLDequeType:addRequires(...)
 	return self.T:addRequires(...)
 end
+-- ok this is not decay
+function STLDequeType:decay() return self.T end
+
 
 local AnonStructType = Type:subclass()
 function AnonStructType:init()
@@ -314,6 +350,8 @@ function AnonStructType:init()
 	self.reqStmt = ''
 end
 function AnonStructType:addRequires(reqStmts) end
+function AnonStructType:decay() return self end
+
 
 local function buildRequireStmts(reqStmts)
 	return table.keys(reqStmts):sort():concat'\n'
@@ -437,23 +475,23 @@ function Emitter:makeTypeNode(
 
 		-- sometimes the type is in the tag name, some times it is in the type-name attribute ...
 		if fieldtag == 'static-string' then
-			local arrayCount = htmlcommon.findattr(fieldnode, 'size')
-			assert(arrayCount, "got a static-string without a size")
-			return ArrayType(Type'char', arrayCount)
+			local size = htmlcommon.findattr(fieldnode, 'size')
+			assert(size, "got a static-string without a size")
+			return ArrayType(Type'char', size)
 		elseif fieldtag == 'static-array' then
 
 			-- here, parse the children as if they were a type of their own
-			-- then append the arrayCount to what you get
+			-- then append the count to what you get
 
-			local arrayCount = htmlcommon.findattr(fieldnode, 'count')
+			local count = htmlcommon.findattr(fieldnode, 'count')
 			-- not specified? maybe it's in index-enum
-			if not arrayCount then
+			if not count then
 				local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
 				if not indexEnum then
 					error("I don't know how to get the size of this array")
 				else
 					indexEnum = makeTypeName(indexEnum)
-					arrayCount = 'Num_'..indexEnum
+					count = 'Num_'..indexEnum
 				end
 			end
 
@@ -465,8 +503,15 @@ function Emitter:makeTypeNode(
 			if code and string.trim(code) ~= '' then
 				out:insert(code)
 			end
-			return ArrayType(baseType, arrayCount)
+			return ArrayType(baseType, count)
 
+		elseif fieldtag == 'padding' then
+			-- padding is just a byte array, right?
+			local name = assert(htmlcommon.findattr(fieldnode, 'name'), "expected 'name'")
+			local size = assert(htmlcommon.findattr(fieldnode, 'size'), "expected 'size'")
+			local resultType = ArrayType(Type'uint8_t', size)
+			out:insert(resultType:declare(name))
+			return resultType
 		elseif fieldtag == 'compound' then
 			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
 			if fieldTypeStr then
@@ -511,9 +556,9 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 				self.outStmts:insert']]'
 			end
 			local resultType = STLDequeType(templateType)
-			-- hmmmm not working
+			-- hmmmm not printing naything ... am I removing it immediately after?
 			--resultType:addRequires(self.reqStmts) 
-			-- instead
+			-- instead ... makes duplicates
 			self.outStmts:insert(resultType.reqStmt)
 			-- TODO move these reqStmts to the top of the file & remove duplicates .. use .reqStmts?
 			return resultType
@@ -532,12 +577,20 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 				self.outStmts:insert']]'
 			end
 			local resultType = STLVectorType(templateType)
-			-- hmmmm not working
+			-- hmmmm not printing naything ... am I removing it immediately after?
 			--resultType:addRequires(self.reqStmts)
-			-- instead
+			-- instead ... makes duplicates
 			self.outStmts:insert(resultType.reqStmt)
 			-- TODO move these reqStmts to the top of the file & remove duplicates .. use .reqStmts?
 			return resultType
+		elseif fieldtag == 'stl-bit-vector' then
+			local resultType = STLVectorType(Type'bool')
+			-- hmmmm not printing naything ... am I removing it immediately after?
+			--resultType:addRequires(self.reqStmts)
+			-- instead ... makes duplicates
+			self.outStmts:insert(resultType.reqStmt)
+			-- TODO move these reqStmts to the top of the file & remove duplicates .. use .reqStmts?
+			return resultType		
 		elseif fieldtag == 'df-flagarray' then
 			local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
 			return Type'df-flagarray'
