@@ -399,10 +399,9 @@ maybe I can use that for better sorting out of require() order later ... to put 
 think I'll keep track of primtiives and requested templates here as well
 and distinguish the craeted types with flags etc ...
 --]]
-local allTypes = {}
+local allTypes = table()
 
 -- add primtiives types here
--- key by xml typename
 for name in ([[
 	void
 	bool
@@ -424,23 +423,59 @@ for name in ([[
 	unsigned int
 	signed int
 	long
+	double
+	
 	float
 	s-float
-	double
 ]]):gmatch'%S+' do
-	allTypes[name] = PrimType{name=name}
+	allTypes:insert(PrimType{name=name})
 end
+
 -- change some special cases from xml names that were mismatched from C names or that aren't compatible with C names
 -- does the XML ever use two dif names to represent the same type?  like "float" and "s-float" ? 
-allTypes['s-float'].name = 'float'
+select(2, assert(allTypes:find(nil, function(t) return t.name == 's-float' end))).name = 'float'
 
-allTypes['df-flagarray'] = Type{name='df_flagarray'}
-allTypes['stl-string'] = Type{
+allTypes:insert(Type{name='df-flagarray', destName='df_flagarray'})
+allTypes:insert(Type{
 	name = 'stl-string',
 	destName = 'std_string',
 	reqStmt = "require 'std.string'",
-}
+})
 
+
+local function getType(name)
+	local _, t = allTypes:find(nil, function(t) return t.name == name end)
+	return (assert(t, "couldn't find type "..tostring(name)))
+end
+
+local function getPrim(name)
+	local t = getType(name)
+	assert(PrimType:isa(t))
+	return t
+end
+
+local function getOrMakeType(name)
+	local _, t = allTypes:find(nil, function(t) return t.name == name end)
+	if not t then
+		t = Type{name=name}
+		allTypes:insert(t)
+	end
+	return t
+end
+
+local function getOrMakePtrType(name)
+	local _, t = allTypes:find(nil, function(t)
+		return PtrType:isa(t)
+		and t.base.name == name
+	end)
+	if not t then
+		-- 'getOrMake' because no guarantee the base type exists
+		-- esp for fwd-declared structs
+		t = PtrType{base=getOrMakeType(name)}
+		allTypes:insert(t)
+	end
+	return t
+end
 
 -- class that spits out a file of a certain type
 local Emitter = class()
@@ -501,13 +536,13 @@ function Emitter:getTypeFromAttrOrChildren(
 	if typeName then
 		-- i think here and only here is this magic value used ...
 		if typeName == 'pointer' then
-			return PtrType{base=Type{name='void'}}
+			return getOrMakePtrType'void'
 		end
 		return Type{name=typeName}
 	end
 
 	local pointerType = htmlcommon.findattr(node, 'pointer-type')
-	if pointerType then return PtrType{base=Type{name=pointerType}} end
+	if pointerType then return getOrMakePtrType(pointerType) end
 
 	if node.child then
 		assert(#node.child > 0)
@@ -654,7 +689,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 				namespace
 			)
 			-- stl-vector has default template-type of void*
-			templateType = templateType or PtrType{base=Type{name='void'}}
+			templateType = templateType or getOrMakePtrType'void'
 
 			-- this is inserting any declaration of inline struct that might be used in the vector definition
 			if code and string.trim(code) ~= '' then
