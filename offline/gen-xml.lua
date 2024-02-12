@@ -189,7 +189,19 @@ local class = require 'ext.class'
 
 local Type = class()
 
-function Type:init(name, destName)
+--[[
+arg:
+	name = a mess ...
+		for primitives, this is the C name
+		for structs, this is the name in the XML file, which is usually snae-cas and matches the variable name (so I can't use it in C code generation)
+	destName = name in generated code
+	reqStmt = stmt to require/create in luajit code
+--]]
+function Type:init(args)
+	local name = args.name
+	local destName = args.destName
+	local reqStmt = args.reqStmt
+
 	-- .name = name in the xml file
 	-- not needed except to test for reserved names
 	self.name = name
@@ -248,29 +260,49 @@ end
 function Type:decay() return self end
 
 
+local PrimType = Type:subclass()
+
+
 local ArrayType = Type:subclass()
-function ArrayType:init(base, count)
+
+--[[
+args:
+	base = base type, must be a Type
+	count = array size
+--]]
+function ArrayType:init(args)
+	local base = args.base
+	local count = args.count
 	assert(Type:isa(base))
 	self.base = assert(base)
 	self.count = assert(count)
 
 	self.destName = self.base.destName..'['..self.count..']'
 end
+
 function ArrayType:addRequires(reqStmts)
 	return self.base:addRequires(reqStmts)
 end
+
 function ArrayType:declare(var)
 	if var then
 		var = snakeToCamelCase(var)
 	end
 	return self.base:declare(var)..'['..self.count..']'
 end
+
 -- is this technically decay?
 function ArrayType:decay() return self.base end
 
 
 local PtrType = Type:subclass()
-function PtrType:init(base)
+
+--[[
+args:
+	base = Type: base type
+--]]
+function PtrType:init(args)
+	local base = args.base
 	assert(Type:isa(base))
 	self.base = assert(base)
 
@@ -316,7 +348,13 @@ function PtrType:decay() return self.base end
 
 local STLType = Type:subclass()
 STLType.localScopeName = 'vector'
-function STLType:init(T)
+
+--[[
+args:
+	T = Type: template type
+--]]
+function STLType:init(args)
+	local T = args.T
 	assert(Type:isa(T))
 	self.T = T
 	-- TODO the suffix substitution will screw up for vector-of-pointers-to-fixed-size-arrays
@@ -336,7 +374,7 @@ local STLDequeType = STLType:subclass()
 
 
 local AnonStructType = Type:subclass()
-function AnonStructType:init()
+function AnonStructType:init(args)
 	-- TODO just set to nil, and don't use it anywhere too
 	self.destName = ''
 	self.reqStmt = ''
@@ -357,8 +395,51 @@ that means now i have to keep track of types ...
 looks like for the sake of enums i have to track them per-xml but across multiple emitted structs
 ... should I just track allll of the created ones?
 maybe I can use that for better sorting out of require() order later ... to put the output into one giant file ...
+
+think I'll keep track of primtiives and requested templates here as well
+and distinguish the craeted types with flags etc ...
 --]]
-local createdTypes = table()
+local allTypes = {}
+
+-- add primtiives types here
+-- key by xml typename
+for name in ([[
+	void
+	bool
+	char
+	unsigned char
+	signed char
+	int8_t
+	int16_t
+	int32_t
+	int64_t
+	uint8_t
+	uint16_t
+	uint32_t
+	uint64_t
+	short
+	unsigned short
+	signed short
+	int
+	unsigned int
+	signed int
+	long
+	float
+	s-float
+	double
+]]):gmatch'%S+' do
+	allTypes[name] = PrimType{name=name}
+end
+-- change some special cases from xml names that were mismatched from C names or that aren't compatible with C names
+-- does the XML ever use two dif names to represent the same type?  like "float" and "s-float" ? 
+allTypes['s-float'].name = 'float'
+
+allTypes['df-flagarray'] = Type{name='df_flagarray'}
+allTypes['stl-string'] = Type{
+	name = 'stl-string',
+	destName = 'std_string',
+	reqStmt = "require 'std.string'",
+}
 
 
 -- class that spits out a file of a certain type
@@ -420,13 +501,13 @@ function Emitter:getTypeFromAttrOrChildren(
 	if typeName then
 		-- i think here and only here is this magic value used ...
 		if typeName == 'pointer' then
-			return PtrType(Type'void')
+			return PtrType{base=Type{name='void'}}
 		end
-		return Type(typeName)
+		return Type{name=typeName}
 	end
 
 	local pointerType = htmlcommon.findattr(node, 'pointer-type')
-	if pointerType then return PtrType(Type(pointerType)) end
+	if pointerType then return PtrType{base=Type{name=pointerType}} end
 
 	if node.child then
 		assert(#node.child > 0)
@@ -482,7 +563,7 @@ function Emitter:makeTypeNode(
 		if fieldtag == 'static-string' then
 			local size = htmlcommon.findattr(fieldnode, 'size')
 			assert(size, "got a static-string without a size")
-			return ArrayType(Type'char', size)
+			return ArrayType{base=Type{name='char'}, count=size}
 		elseif fieldtag == 'static-array' then
 
 			-- here, parse the children as if they were a type of their own
@@ -508,13 +589,13 @@ function Emitter:makeTypeNode(
 			if code and string.trim(code) ~= '' then
 				out:insert(code)
 			end
-			return ArrayType(baseType, count)
+			return ArrayType{base=baseType, count=count}
 
 		elseif fieldtag == 'padding' then
 			-- padding is just a byte array, right?
 			local name = assert(htmlcommon.findattr(fieldnode, 'name'), "expected 'name'")
 			local size = assert(htmlcommon.findattr(fieldnode, 'size'), "expected 'size'")
-			local resultType = ArrayType(Type'uint8_t', size)
+			local resultType = ArrayType{base=Type{name='uint8_t'}, count=size}
 			out:insert(resultType:declare(name))
 			return resultType
 		elseif fieldtag == 'compound' then
@@ -523,7 +604,7 @@ function Emitter:makeTypeNode(
 io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 				-- type-name means we're using an already-defined struct name
 				assert(not fieldnode.child, "found a compound with a type-name and with children ...")
-				return Type(fieldTypeStr)
+				return Type{name=fieldTypeStr}
 			else
 				assert(fieldnode.child, "found a compound without a type and without children...")
 
@@ -545,7 +626,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			local fieldTypeStr = htmlcommon.findattr(fieldnode, 'type-name')
 				or htmlcommon.findattr(fieldnode, 'base-type')
 				or 'int32_t'	-- sometimes a bitfield has a name and some flag bits, but not base-type or type-name.  ex: cave_column_rectangle::unk_7
-			return Type(fieldTypeStr)
+			return Type{name=fieldTypeStr}
 		elseif fieldtag == 'stl-deque' then
 			-- uhhh ... same as stl-vector, sometimes no type-name nor pointer-type nor single-child-node are used, and an inline struct is implied
 			local templateType, code = self:getTypeFromAttrOrChildren(
@@ -560,7 +641,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 				self.outStmts:insert(code)
 				self.outStmts:insert']]'
 			end
-			local resultType = STLDequeType(templateType)
+			local resultType = STLDequeType{T=templateType}
 			-- hmmmm reqStmts sorts and inserts at the top, but some of these need to go after their locally-defined structs ... 
 			resultType:addRequires(self.reqStmts) 
 			-- instead ... makes duplicates
@@ -573,7 +654,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 				namespace
 			)
 			-- stl-vector has default template-type of void*
-			templateType = templateType or PtrType(Type'void')
+			templateType = templateType or PtrType{base=Type{name='void'}}
 
 			-- this is inserting any declaration of inline struct that might be used in the vector definition
 			if code and string.trim(code) ~= '' then
@@ -581,7 +662,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 				self.outStmts:insert(code)
 				self.outStmts:insert']]'
 			end
-			local resultType = STLVectorType(templateType)
+			local resultType = STLVectorType{T=templateType}
 			-- hmmmm reqStmts sorts and inserts at the top, but some of these need to go after their locally-defined structs ... 
 			resultType:addRequires(self.reqStmts)
 			-- instead ... makes duplicates
@@ -589,7 +670,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			-- TODO move these reqStmts to the top of the file & remove duplicates ...
 			return resultType
 		elseif fieldtag == 'stl-bit-vector' then
-			local resultType = STLVectorType(Type'bool')
+			local resultType = STLVectorType{T=Type{name='bool'}}
 			-- hmmmm reqStmts sorts and inserts at the top, but some of these need to go after their locally-defined structs ... 
 			resultType:addRequires(self.reqStmts)
 			-- instead ... makes duplicates
@@ -599,14 +680,14 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			return resultType		
 		elseif fieldtag == 'df-flagarray' then
 			local indexEnum = htmlcommon.findattr(fieldnode, 'index-enum')
-			return Type'df-flagarray'
+			return Type{name='df-flagarray'}
 		elseif fieldtag == 'pointer' then
 			local ptrBaseType, code = self:getTypeFromAttrOrChildren(
 				fieldnode,
 				namespace
 			)
 			-- pointer has default base type of void, i.e. the pointer has a default type of void*
-			ptrBaseType = ptrBaseType or Type'void'
+			ptrBaseType = ptrBaseType or Type{name='void'}
 
 			if code and string.trim(code) ~= '' then
 				out:insert(code)
@@ -616,7 +697,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			local isArray = htmlcommon.findattr(fieldnode, 'is-array') == 'true'
 			--]]
 
-			return PtrType(ptrBaseType)
+			return PtrType{base=ptrBaseType}
 		elseif fieldtag == 'enum' then
 			-- TODO here, if we have children, create a new type based on the children
 			-- and use the field name (and the struct name) as the enum name
@@ -640,9 +721,9 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 				out:insert('// TODO need to insert an enum here for field '..self.baseFieldName)
 			end
 
-			return Type(fieldTypeStr)
+			return Type{name=fieldTypeStr}
 		elseif fieldtag == 'stl-string' then
-			return Type'stl-string'
+			return Type{name='stl-string'}
 		elseif fieldtag == 'df-other-vectors-type' then
 			-- this class name:
 			local typeName = assert(htmlcommon.findattr(fieldnode, 'type-name'))
@@ -658,7 +739,7 @@ io.stderr:write('compound type-name '..fieldTypeStr..'\n')
 			-- TODO i guess now I have to lookup the type generated by index-enum to get its children
 			-- and that means I have to now start keeping track of all types and not just generating code as I encounter them
 		else
-			return Type(fieldtag)	-- prim
+			return Type{name=fieldtag}	-- prim
 		end
 	end, function(err)
 		return 'for base name '..tostring(self.baseFieldName)..'\n'
@@ -678,7 +759,9 @@ function Emitter:getStructTypeWithUniqueName(structDestName)
 	for suffix=1,math.huge do
 		-- keep building structTypes until we find one that's not used
 		-- this should  be fine so long as the Type ctor doesn't write to any external places
-		local structType = Type(nil, structDestName..(suffix == 1 and '' or suffix))
+		local structType = Type{
+			destName = structDestName..(suffix == 1 and '' or suffix),
+		}
 		if not self.locallyDefinedStructs:find(nil, function(s) return s.destName == structType.destName end) then
 			self.locallyDefinedStructs:insert(structType)
 			return structType
@@ -1030,7 +1113,7 @@ function GlobalEmitter:process(node)
 			for _,code in ipairs(globalStructDefs) do
 				self.structCode:insert(code)
 			end
-			self.objDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType(globalType):declare().."', "..('0x%x'):format(var.addr)..")")
+			self.objDefs:insert("df."..snakeToCamelCase(name).." = ffi.cast('"..PtrType{base=globalType}:declare().."', "..('0x%x'):format(var.addr)..")")
 		end
 	end, function(err)
 		return 'for global '..name..'\n'
@@ -1107,7 +1190,7 @@ for _,f in ipairs(fs) do
 			or ch.tag == 'struct-type'
 			then
 				local structSrcName = assert(htmlcommon.findattr(ch, 'type-name'))
-				local structType = Type(structSrcName)
+				local structType = Type{name=structSrcName}
 				local structDstName = structType.destName
 
 				local emit = StructEmitter{
