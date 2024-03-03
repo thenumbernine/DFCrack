@@ -4813,7 +4813,7 @@ typedef struct {
 -- worldgen_parms.h
 
 ffi.cdef[[
-typedef struct {
+typedef struct WorldGenParams {
 	std_string title;
 	std_string seed; /*!< since v0.34.01 */
 	std_string historySeed; /*!< since v0.34.01 */

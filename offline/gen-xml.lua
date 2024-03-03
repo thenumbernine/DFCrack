@@ -398,6 +398,11 @@ maybe I can use that for better sorting out of require() order later ... to put 
 
 think I'll keep track of primtiives and requested templates here as well
 and distinguish the craeted types with flags etc ...
+
+
+and fwd declarations ... hmm
+i have to keep track of struct declarations vs struct type references separately
+in order to sort out requires and typedefs in proper order
 --]]
 local allTypes = table()
 
