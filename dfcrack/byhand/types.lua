@@ -12,7 +12,7 @@ local ffi = require 'ffi'
 local template = require 'template'
 local struct = require 'struct'
 
-local asserteq = require 'asserteq'
+local assert = require 'ext.assert'
 local assertsizeof = require 'assertsizeof'
 
 local vec2s = require 'vec-ffi.vec2s'
@@ -3524,14 +3524,14 @@ struct HistoricalFigure {
 } HistoricalFigure;
 ]]
 
-asserteq(ffi.offsetof('HistoricalFigure', 'profession'), 0)
-asserteq(ffi.offsetof('HistoricalFigure', 'race'), 2)
-asserteq(ffi.offsetof('HistoricalFigure', 'caste'), 4)
-asserteq(ffi.offsetof('HistoricalFigure', 'sex'), 6)
-asserteq(ffi.offsetof('HistoricalFigure', 'orientationFlags'), 8)
-asserteq(ffi.offsetof('HistoricalFigure', 'appearedYear'), 0xc)
-asserteq(ffi.offsetof('HistoricalFigure', 'name'), 0x38)
-asserteq(ffi.offsetof('HistoricalFigure', 'unk_fc'), 0x128)
+assert.eq(ffi.offsetof('HistoricalFigure', 'profession'), 0)
+assert.eq(ffi.offsetof('HistoricalFigure', 'race'), 2)
+assert.eq(ffi.offsetof('HistoricalFigure', 'caste'), 4)
+assert.eq(ffi.offsetof('HistoricalFigure', 'sex'), 6)
+assert.eq(ffi.offsetof('HistoricalFigure', 'orientationFlags'), 8)
+assert.eq(ffi.offsetof('HistoricalFigure', 'appearedYear'), 0xc)
+assert.eq(ffi.offsetof('HistoricalFigure', 'name'), 0x38)
+assert.eq(ffi.offsetof('HistoricalFigure', 'unk_fc'), 0x128)
 assertsizeof('HistoricalFigure', 328)
 makeStdVectorPtr'HistoricalFigure'
 
@@ -6171,25 +6171,25 @@ typedef struct World {
 } World;
 ]]
 -- gdb: macro define offsetof(t, f) &((t *) 0)->f
-asserteq(ffi.offsetof('World', 'items'), 0x13ef8)	-- good
-asserteq(ffi.offsetof('World', 'buildings'), 0x1c928)	-- good
-asserteq(ffi.offsetof('World', 'machines'), 0x1d208)	-- good
-asserteq(ffi.offsetof('World', 'flowGuides'), 0x1d240)	-- good
-asserteq(ffi.offsetof('World', 'enemyStatusCache'), 0x1d460)	-- good
-asserteq(ffi.offsetof('World', 'status'), 0x111958)	-- good
-asserteq(ffi.offsetof('World', 'interctionInstances'), 0x113728)	-- good
-asserteq(ffi.offsetof('World', 'writtenContents'), 0x113758)	-- good
-asserteq(ffi.offsetof('World', 'identities'), 0x113788)	-- good
-asserteq(ffi.offsetof('World', 'crimes'), 0x1137e8)	-- good
-asserteq(ffi.offsetof('World', 'armyTrackingInfo'), 0x1138c0)	-- good
-asserteq(ffi.offsetof('World', 'worldgenStatus'), 0x1175e8)	-- good
-asserteq(ffi.offsetof('World', 'pathfinder'), 0x130928)	-- good
-asserteq(ffi.offsetof('World', 'features'), 0x2691a0)	-- good
-asserteq(ffi.cast('size_t', ffi.cast('void*', ffi.cast('World*', 0).features.unk_15)), 0x269380)
-asserteq(ffi.offsetof('World', 'allowAnnouncements'), 0x2693a8)
-asserteq(ffi.offsetof('World', 'unknown_26a9a9'), 0x2693a9)
-asserteq(ffi.offsetof('World', 'unknown_26a9aa'), 0x2693aa)
-asserteq(ffi.offsetof('World', 'arenaSpawn'), 0x2693b0)
+assert.eq(ffi.offsetof('World', 'items'), 0x13ef8)	-- good
+assert.eq(ffi.offsetof('World', 'buildings'), 0x1c928)	-- good
+assert.eq(ffi.offsetof('World', 'machines'), 0x1d208)	-- good
+assert.eq(ffi.offsetof('World', 'flowGuides'), 0x1d240)	-- good
+assert.eq(ffi.offsetof('World', 'enemyStatusCache'), 0x1d460)	-- good
+assert.eq(ffi.offsetof('World', 'status'), 0x111958)	-- good
+assert.eq(ffi.offsetof('World', 'interctionInstances'), 0x113728)	-- good
+assert.eq(ffi.offsetof('World', 'writtenContents'), 0x113758)	-- good
+assert.eq(ffi.offsetof('World', 'identities'), 0x113788)	-- good
+assert.eq(ffi.offsetof('World', 'crimes'), 0x1137e8)	-- good
+assert.eq(ffi.offsetof('World', 'armyTrackingInfo'), 0x1138c0)	-- good
+assert.eq(ffi.offsetof('World', 'worldgenStatus'), 0x1175e8)	-- good
+assert.eq(ffi.offsetof('World', 'pathfinder'), 0x130928)	-- good
+assert.eq(ffi.offsetof('World', 'features'), 0x2691a0)	-- good
+assert.eq(ffi.cast('size_t', ffi.cast('void*', ffi.cast('World*', 0).features.unk_15)), 0x269380)
+assert.eq(ffi.offsetof('World', 'allowAnnouncements'), 0x2693a8)
+assert.eq(ffi.offsetof('World', 'unknown_26a9a9'), 0x2693a9)
+assert.eq(ffi.offsetof('World', 'unknown_26a9aa'), 0x2693aa)
+assert.eq(ffi.offsetof('World', 'arenaSpawn'), 0x2693b0)
 assertsizeof('World', 2534184)
 
 -- caravan_state.h
