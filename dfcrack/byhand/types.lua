@@ -20,9 +20,9 @@ local vec3s = require 'vec-ffi.vec3s'
 local vec3i = require 'vec-ffi.vec3i'
 -- not sure if i like glsl or hlsl naming convention more...
 ffi.cdef[[
-typedef vec2s_t short2_t;
-typedef vec3s_t short3_t;
-typedef vec3i_t int3_t;
+typedef vec2s short2_t;
+typedef vec3s short3_t;
+typedef vec3i int3_t;
 ]]
 
 require 'std.string'
